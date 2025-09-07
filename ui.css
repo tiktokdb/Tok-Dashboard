@@ -1,0 +1,265 @@
+:root{
+  --bg: #0b0f1a;
+  --card: #111827;
+  --muted: #6b7280;
+  --text: #e5e7eb;
+  --primary: #7c3aed;
+  --primary-2: #22d3ee;
+  --ring: rgba(124,58,237,.45);
+  --ok: #10b981;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+  --stroke: rgba(255,255,255,.08);
+}
+
+*{ box-sizing: border-box }
+
+html,body,#root{
+  height:100%;
+  margin:0;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(34,211,238,.25), transparent 60%),
+    radial-gradient(1200px 600px at -10% 20%, rgba(124,58,237,.18), transparent 55%),
+    var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Apple Color Emoji","Segoe UI Emoji";
+}
+
+/* Top bar */
+.tb{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 20px; position:sticky; top:0; z-index:10;
+  backdrop-filter: blur(10px);
+  background: linear-gradient(180deg, rgba(11,15,26,.85), rgba(11,15,26,.55));
+  border-bottom: 1px solid var(--stroke);
+}
+.brand{
+  display:flex; align-items:center; gap:12px; font-weight:800; letter-spacing:.3px;
+}
+.brand .dot{
+  width:10px; height:10px; border-radius:999px;
+  background: radial-gradient(circle at 30% 30%, var(--primary), var(--primary-2));
+  box-shadow: 0 0 0 5px rgba(124,58,237,.18), 0 0 24px var(--primary);
+}
+
+/* Page wrap */
+.page{ margin: 22px auto; width:min(1200px, 94vw); }
+.kpis{
+  display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:12px;
+}
+.card{
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+  border: 1px solid var(--stroke); border-radius:16px; padding:14px 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.25);
+}
+.k h4{ margin:0; font-size:12px; color:var(--muted); font-weight:600 }
+.k .v{ font-weight:800; font-size:22px; margin-top:8px }
+
+/* Toolbar */
+.toolbar{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:16px 0 8px }
+.input, .select{
+  background: rgba(255,255,255,.06);
+  border:1px solid var(--stroke); color:var(--text);
+  padding:10px 12px; border-radius: 12px; outline:none; min-width: 200px;
+}
+.input:focus, .select:focus{ box-shadow: 0 0 0 4px var(--ring); border-color: transparent }
+
+.btn{
+  padding:10px 12px; border-radius:12px; font-weight:700; border:1px solid var(--stroke);
+  background: rgba(255,255,255,.06); color: var(--text); cursor:pointer
+}
+.btn.primary{
+  background: linear-gradient(135deg, var(--primary), var(--primary-2));
+  border: none;
+}
+.btn.ghost{ background:transparent }
+.btn:disabled{ opacity:.6; cursor:not-allowed }
+
+/* Overdue date input (not Posted) */
+.input-overdue {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, .35) !important;
+}
+
+/* Table */
+.tableWrap.card { overflow: visible !important; }  /* let tooltips escape the card */
+.tableWrap { position: relative; z-index: 1; }
+
+.tableWrap .tableWrapInner { position: relative; } /* optional if you use an inner wrap */
+
+table{ width:100%; border-collapse: collapse; min-width: 860px; }
+th, td{ padding:12px 10px; border-bottom:1px solid var(--stroke); }
+
+th{
+  position:sticky; top:0;
+  background: rgba(11,15,26,.8);
+  backdrop-filter: blur(6px);
+  text-align:left; font-weight:700; font-size:12px; letter-spacing:.25px;
+  z-index:2;                    /* so header sits above rows */
+  overflow: visible !important; /* don't clip tooltip bubble */
+}
+.tableWrap thead th:hover{ z-index:3; } /* raise hovered header */
+
+td .cell{ display:flex; align-items:center; gap:8px }
+td input, td select{
+  width:100%; background: rgba(255,255,255,.05); border:1px solid var(--stroke);
+  color: var(--text); padding:10px; border-radius:10px; outline:none
+}
+td input:focus, td select:focus{ box-shadow: 0 0 0 4px var(--ring); border-color: transparent }
+.badge{
+  font-size:11px; padding:4px 8px; border-radius:999px; border:1px solid var(--stroke);
+  background: rgba(255,255,255,.06)
+}
+.badge.ok{ color: var(--ok) }
+.badge.warn{ color: var(--warn) }
+
+/* Footer row */
+tfoot td{ font-weight:800; background: rgba(255,255,255,.04) }
+
+/* Tiny text */
+.muted{ color: #9aa4b2; font-size:12px }
+
+/* Chips */
+.chips{ display:flex; gap:8px; flex-wrap:wrap }
+.chip{
+  padding:6px 10px; border-radius:999px; border:1px solid var(--stroke);
+  background: rgba(255,255,255,.06); font-size:12px; cursor:pointer
+}
+.chip.active{ box-shadow: inset 0 0 0 2px var(--ring) }
+
+/* ==== Select dropdown: readable options on dark theme ==== */
+:root { color-scheme: dark; } /* help browsers pick dark UI */
+
+select option,
+.select option {
+  background-color: #0b0f1a !important;  /* same as --bg */
+  color: #e5e7eb !important;             /* same as --text */
+}
+
+/* When an option is highlighted/selected in the popup list */
+select option:checked,
+.select option:checked {
+  background-color: #1f2937 !important;  /* slate-800 */
+  color: #ffffff !important;
+}
+
+/* While hovering with mouse (supported in most modern browsers) */
+select option:hover,
+.select option:hover {
+  background-color: #334155 !important;  /* slate-700 */
+  color: #ffffff !important;
+}
+
+/* Slightly stronger contrast for placeholders */
+input::placeholder { color: #9aa4b2; opacity: 1; }
+
+/* Make KPI cards clickable when they act like buttons */
+.card.k[role="button"] {
+  cursor: pointer;
+  transition: transform .06s ease, box-shadow .15s ease;
+}
+.card.k[role="button"]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 40px rgba(0,0,0,.35);
+}
+.card.k[role="button"]:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--ring);
+}
+
+/* === FINAL: Products table header tooltips (unclipped + on top) === */
+
+/* the little "?" badge */
+.th-help{
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  width: 18px; height: 18px;
+  border: 1px solid var(--stroke);
+  border-radius: 50%;
+  font-size: 12px; line-height: 1;
+  background: rgba(255,255,255,.06);
+  cursor: help;
+  user-select: none;
+  z-index: 4;
+}
+.th-help::before { content: "?"; }
+
+/* the tooltip bubble */
+.th-help .th-tip{
+  position: absolute;
+  top: 125%;                     /* below the header text */
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: rgba(0,0,0,.92);
+  color: var(--text, #fff);
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 10px 12px;
+  white-space: nowrap;           /* single-line bubble; remove if you want wraps */
+  box-shadow: 0 8px 30px rgba(0,0,0,.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s ease, transform .15s ease;
+  z-index: 99999;                /* ensure above headers/rows */
+}
+
+/* little arrow */
+.th-help .th-tip::after{
+  content: "";
+  position: absolute;
+  top: -6px; left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-bottom-color: rgba(0,0,0,.92);
+}
+
+/* show on hover/focus */
+.th-help:hover .th-tip,
+.th-help:focus-within .th-tip{
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ===== Center headers + set column widths (Products table) ===== */
+
+/* center all header labels by default */
+.tableWrap thead th { 
+  text-align: center;
+  white-space: nowrap;   /* prevent wrapping that misaligns things */
+  padding-bottom: 10px;  /* tiny visual spacing above fields */
+}
+
+/* keep these left aligned for readability */
+.tableWrap thead th:nth-child(1),     /* Product */
+.tableWrap thead th:nth-child(2),     /* Brand */
+.tableWrap thead th:last-child {      /* delete/utility */
+  text-align: left;
+}
+
+/* match widths for th and td so columns line up */
+/* Adjust percentages if you tweak columns later */
+.tableWrap th:nth-child(1),  .tableWrap td:nth-child(1)  { width: 18%; } /* Product */
+.tableWrap th:nth-child(2),  .tableWrap td:nth-child(2)  { width: 14%; } /* Brand */
+.tableWrap th:nth-child(3),  .tableWrap td:nth-child(3)  { width: 10%; } /* Status */
+.tableWrap th:nth-child(4),  .tableWrap td:nth-child(4)  { width: 12%; } /* Deliverable */
+.tableWrap th:nth-child(5),  .tableWrap td:nth-child(5)  { width: 12%; } /* Due */
+.tableWrap th:nth-child(6),  .tableWrap td:nth-child(6)  { width: 8%;  text-align:right; } /* Cost */
+.tableWrap th:nth-child(7),  .tableWrap td:nth-child(7)  { width: 10%; text-align:right; } /* Value (MSRP) */
+.tableWrap th:nth-child(8),  .tableWrap td:nth-child(8)  { width: 10%; } /* Got as */
+.tableWrap th:nth-child(9),  .tableWrap td:nth-child(9)  { width: 8%;  text-align:center; } /* Reimbursed */
+.tableWrap th:nth-child(10), .tableWrap td:nth-child(10) { width: 10%; } /* Link */
+.tableWrap th:nth-child(11), .tableWrap td:nth-child(11) { width: 6%;  } /* Actions */
+
+/* make number fields read like numbers */
+td input[type="number"] { text-align: right; }
+
+/* keep the ? tooltip nice with centered headers */
+.tableWrap thead th .th-help { 
+  display: inline-flex; 
+  vertical-align: middle; 
+  margin-left: 6px; 
+  transform: translateY(-1px);
+}
