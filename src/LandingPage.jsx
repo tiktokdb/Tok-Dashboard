@@ -4,7 +4,7 @@
 
 import React, { useEffect, useState } from "react";
 import { ensureToken, fetchUserEmail } from "./google";
-import { isAllowedEmail, STAN_URL } from "./allowlist";
+import { isAllowedEmail, STAN_URL, buildCheckoutUrl } from "./allowlist";
 
 
 export default function LandingPage({ onSignedIn, error }) {
@@ -46,8 +46,8 @@ export default function LandingPage({ onSignedIn, error }) {
           const ok = await isAllowedEmail(em);
           if (!ok) {
             // Not on allowlist → send to checkout
-            alert("Access requires an active subscription. You’ll be redirected to purchase.");
-            window.location.href = STAN_URL;
+            alert("Access requires an active subscription. Redirecting to checkout…");
+            window.location.href = buildCheckoutUrl(STAN_URL, em);
             return;
           }
           // Allowed → proceed
