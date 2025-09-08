@@ -6,7 +6,7 @@
 
   /* A generic container if you want to wrap pages */
   .container {
-    max-width: 980px;
+    max-width: 768px;
       margin: 0 auto;
         padding: 0 var(--page-pad);
         }
