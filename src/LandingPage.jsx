@@ -226,10 +226,6 @@ export default function LandingPage({ onSignedIn, error }) {
           </div>
         )}
 
-        <p className="fine">
-          Founding price planned: <b>$19.99/year</b> (regular <b>$29.99/year</b>).
-        </p>
-
         <p className="links">
           <a href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy</a>
           {" · "}
