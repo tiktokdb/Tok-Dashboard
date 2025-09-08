@@ -272,7 +272,7 @@ input::placeholder { color: #9aa4b2; opacity: 1; }
 .tableWrap th:nth-child(4),  .tableWrap td:nth-child(4)  { min-width: 140px; } /* Deliverable */
 .tableWrap th:nth-child(5),  .tableWrap td:nth-child(5)  { min-width: 160px; } /* Due */
 
-.tableWrap th:nth-child(6),  .tableWrap td:nth-child(6)  { width: 90px;  text-align: right; } /* Cost */
+.tableWrap th:nth-child(6),  .tableWrap td:nth-child(6)  { width: 120px; text-align: right; } /* Cost */
 .tableWrap th:nth-child(7),  .tableWrap td:nth-child(7)  { width: 120px; text-align: right; } /* Value (MSRP) */
 
 .tableWrap th:nth-child(8),  .tableWrap td:nth-child(8)  { min-width: 120px; } /* Got as */
