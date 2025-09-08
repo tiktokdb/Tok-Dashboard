@@ -9,25 +9,28 @@ export default function LandingPage({ onSignedIn, error }) {
   const [signingIn, setSigningIn] = useState(false);
   const [logoSrc, setLogoSrc] = useState(null);
 
-  // Try to find a logo automatically
+  // --- Find a logo automatically (public/logo.* or an override) ---
   useEffect(() => {
+    const base = (import.meta?.env?.BASE_URL || "/").replace(/\/+$/, "") + "/";
     const candidates = [
       typeof window !== "undefined" ? window.__TOKBOARD_LOGO_URL__ : null,
-      "/logo.svg",
-      "/logo.png",
-      "/logo.jpg",
+      base + "logo.svg",
+      base + "logo.png",
+      base + "logo.jpg",
     ].filter(Boolean);
 
     let i = 0;
     const tryNext = () => {
       if (i >= candidates.length) return;
+      const url = candidates[i];
       const img = new Image();
-      img.onload = () => setLogoSrc(candidates[i]);
+      img.onload = () => setLogoSrc(url);
       img.onerror = () => { i += 1; tryNext(); };
-      img.src = candidates[i];
+      img.src = url;
     };
     tryNext();
   }, []);
+
 
   async function handleSignInClick() {
     setSigningIn(true);
