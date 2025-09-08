@@ -4,6 +4,8 @@
 
 import React, { useEffect, useState } from "react";
 import { ensureToken, fetchUserEmail } from "./google";
+import { isAllowedEmail, STAN_URL } from "./allowlist";
+
 
 export default function LandingPage({ onSignedIn, error }) {
   const [signingIn, setSigningIn] = useState(false);
@@ -34,11 +36,21 @@ export default function LandingPage({ onSignedIn, error }) {
   async function handleSignInClick() {
     setSigningIn(true);
     try {
-      await ensureToken("consent"); // triggers Google redirect if needed
+      await ensureToken("consent"); // may redirect
+
       const tok = window.gapi?.client?.getToken?.();
       if (tok?.access_token) {
         const em = await fetchUserEmail();
         if (em) {
+          // NEW: check allowlist
+          const ok = await isAllowedEmail(em);
+          if (!ok) {
+            // Not on allowlist → send to checkout
+            alert("Access requires an active subscription. You’ll be redirected to purchase.");
+            window.location.href = STAN_URL;
+            return;
+          }
+          // Allowed → proceed
           onSignedIn?.(em);
           setSigningIn(false);
           return;
@@ -186,7 +198,7 @@ export default function LandingPage({ onSignedIn, error }) {
         <section className="hero">
           <ul className="features">
             <li><span className="dot" /> Log products with brand, status, deliverables, due dates, costs, links, and notes.</li>
-            <li><span className="dot" /> Instant KPIs: <b>purchased</b>, <b>unreimbursed</b>, and <b>gifted/reimbursed</b> value.</li>
+            <li><span className="dot" /> Instant KPIs: <b>purchased</b>,<b>unreimbursed</b>,and<b>gifted/reimbursed</b> value.</li>
             <li><span className="dot" /> <b>Your data stays in your Google account</b> (we don’t store your spreadsheet).</li>
             <li><span className="dot" /> <i>Coming soon:</i> Brand Deals & Requests.</li>
           </ul>
