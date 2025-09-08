@@ -174,7 +174,7 @@ export async function findOrCreateSpreadsheet() {
 
   const parts = [
     ["Products", ["Product", "Cost of Product", "Note"]],
-    ["Non-Products", ["Studio Invite", "Paid Amount", "Reason", "Date", "Status"]],
+    ["Brand Deals", ["Studio Invite", "Paid Amount", "Reason", "Date", "Status"]],
     ["Requests", ["Company", "Product", "Collab Message", "Request", "Ad Code Sent", "Notes"]],
     ["Posting Times", ["Day of the Week", "Best Time to Post"]],
   ]
