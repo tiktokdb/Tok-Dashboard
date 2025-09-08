@@ -3,7 +3,7 @@ import Products from "./tabs/Products"
 
 const TABS = [
   { key: "products", label: "Products" },
-  { key: "nonproducts", label: "Non-Products", coming: true },
+  { key: "branddeals", label: "Brand Deals", coming: true },
   { key: "requests", label: "Requests", coming: true },
   { key: "times", label: "Posting Times", coming: true },
 ]
