@@ -125,6 +125,21 @@ th{
 .tableWrap thead th:hover{ z-index:3; } /* raise hovered header */
 
 td .cell{ display:flex; align-items:center; gap:8px }
+/* allow children to shrink inside flex cells */
+td .cell > * { min-width: 0; }
+
+/* make the number input fill Cost/MSRP cells even with an icon beside it */
+.tableWrap td:nth-child(6) .cell > input,
+.tableWrap td:nth-child(7) .cell > input {
+  flex: 1 1 auto;
+  width: 100%;
+}
+
+/* icon/button siblings shouldn't steal flex space */
+.tableWrap td:nth-child(6) .cell > :not(input),
+.tableWrap td:nth-child(7) .cell > :not(input) {
+  flex: 0 0 auto;
+}
 td input, td select{
   width:100%; background: rgba(255,255,255,.05); border:1px solid var(--stroke);
   color: var(--text); padding:10px; border-radius:10px; outline:none
