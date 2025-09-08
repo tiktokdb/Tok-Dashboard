@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>TokBoard – Privacy Policy</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial}
+    .wrap{max-width:840px; margin:40px auto; padding:0 16px}
+    h1{margin:0 0 12px; font-size:32px}
+    h2{margin:28px 0 8px; font-size:20px}
+    p,li{line-height:1.6}
+    code{background:#f3f4f6; padding:2px 6px; border-radius:6px}
+    .muted{color:#6b7280}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Privacy Policy</h1>
+    <p class="muted">Effective: <span id="eff"></span></p>
+
+    <p><b>TokBoard</b> is a creator workflow tool that connects to your Google account (with your consent) to read/write rows in Google Sheets that you control. We don’t run a database for your product data—your rows live in your Google account.</p>
+
+    <h2>What we collect</h2>
+    <ul>
+      <li><b>Google account email</b> (read-only), used to identify your session.</li>
+      <li><b>OAuth tokens</b> in your browser only, to access Google Sheets/Drive.file on your behalf.</li>
+      <li><b>Payment info</b> is processed by our payment provider (e.g., Stripe or Gumroad). TokBoard never sees full card data.</li>
+      <li>Basic product analytics and error logs (aggregated, non-sensitive).</li>
+    </ul>
+
+    <h2>Where your data lives</h2>
+    <p>Your product rows are stored in Google Sheets within your Google account. We do not store a server copy of your sheet contents.</p>
+
+    <h2>How we use data</h2>
+    <ul>
+      <li>To let you sign in and use TokBoard.</li>
+      <li>To read/write the specific spreadsheet tabs you direct us to.</li>
+      <li>To communicate essential updates (e.g., billing or service notices).</li>
+      <li>To prevent abuse and improve reliability.</li>
+    </ul>
+
+    <h2>Google API Services</h2>
+    <p>Use of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+
+    <h2>Payments</h2>
+    <p>Subscriptions are handled by a third-party processor (e.g., Stripe/Gumroad). They act as the merchant of record for your payment details. TokBoard receives only minimal billing metadata (e.g., success/failed status, plan, email).</p>
+
+    <h2>Cookies & local storage</h2>
+    <p>We use local storage/cookies for sign-in state and basic preferences. You can clear them in your browser at any time.</p>
+
+    <h2>Access & deletion</h2>
+    <ul>
+      <li>Revoke Google access anytime at <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.</li>
+      <li>Delete your spreadsheet from Google Drive to remove your product data.</li>
+      <li>For billing records or account questions, email us (see Contact).</li>
+    </ul>
+
+    <h2>Children</h2>
+    <p>TokBoard is not directed to children under 13, and we do not knowingly collect their data.</p>
+
+    <h2>International users</h2>
+    <p>Your data may be processed where our providers operate. By using TokBoard you consent to such processing.</p>
+
+    <h2>Changes</h2>
+    <p>We may update this policy. We’ll adjust the effective date and, if material, notify you in-app or by email.</p>
+
+    <h2>Contact</h2>
+    <p>Email: <a href="mailto:support@tokboard.app">support@tokboard.app</a></p>
+  </div>
+
+  <script>
+    document.getElementById('eff').textContent =
+      new Date().toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
+  </script>
+</body>
+</html>
