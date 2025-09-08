@@ -200,7 +200,7 @@ export default function LandingPage({ onSignedIn, error }) {
         <section className="hero">
           <ul className="features">
             <li><span className="dot" /> Log products with brand, status, deliverables, due dates, costs, links, and notes.</li>
-            <li><span className="dot" /><span>Instant KPIs: <b>purchased</b>, <b>unreimbursed</b>, and <b>gifted/reimbursed</b> value.</span></li>
+            <li><span className="dot" /><span>Instant KPIs: <b>purchased,</b> <b>unreimbursed,</b> and <b>gifted/reimbursed</b> value.</span></li>
             <li><span className="dot" /> <b>Your data stays in your Google account</b> (we don’t store your spreadsheet).</li>
             <li><span className="dot" /> <i>Coming soon:</i> Brand Deals & Requests.</li>
           </ul>
