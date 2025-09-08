@@ -1,6 +1,6 @@
 // src/tabs/Products.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react"
-import { findOrCreateSpreadsheet, readTab, writeTab } from "../google"
+import { findOrCreateSpreadsheet, readTab } from "../google"
 
 /* ------------ constants ------------ */
 const STATUSES = ["Incoming", "Reviewing", "Filming", "Posted"]
@@ -27,6 +27,13 @@ const isTrue = (v) => {
     s === "checked"
   )
 }
+
+// keep money() and isTrue() above, then add:
+const clampMoney = (v) => {
+  const n = money(v);
+  return n < 0 ? 0 : +n.toFixed(2);
+};
+
 
 /* ------------ row shape (uses simplified Got as + Reimbursed) ------------ */
 function newRow() {
@@ -382,56 +389,56 @@ export default function Products() {
   }
 
   // Move between lists when status crosses to/from "Posted"
-  function update(i, key, val) {
+    function update(i, key, val) {
     if (view === "active") {
-      setRows((prev) => {
-        const current = prev[i]
-        const next = { ...current, [key]: val }
+        setRows((prev) => {
+        const current = prev[i];
+        const next = { ...current, [key]: val };
+
+        // If changing to Free, reimbursed cannot be true
+        if (key === "Got as" && val === "Free") next.Reimbursed = false;
 
         // to Posted
         if (key === "Status" && val === "Posted" && current.Status !== "Posted") {
-          const remaining = prev.filter((_, idx) => idx !== i)
-          const newPosted = dedupeBySig(withIds([...postedRowsRef.current, next]))
-          setPostedRows(newPosted)
-          if (loadedRef.current) {
-            setDirty(true)
-            setPostedDirty(true)
-          }
-          persistSheetsNow(remaining, newPosted)
-          return remaining
+            const remaining = prev.filter((_, idx) => idx !== i);
+            const newPosted = dedupeBySig(withIds([...postedRowsRef.current, next]));
+            setPostedRows(newPosted);
+            if (loadedRef.current) { setDirty(true); setPostedDirty(true); }
+            persistSheetsNow(remaining, newPosted);
+            return remaining;
         }
 
-        const clone = [...prev]
-        clone[i] = next
-        if (loadedRef.current) setDirty(true)
-        return clone
-      })
+        const clone = [...prev];
+        clone[i] = next;
+        if (loadedRef.current) setDirty(true);
+        return clone;
+        });
     } else {
-      // view === "posted"
-      setPostedRows((prev) => {
-        const current = prev[i]
-        const next = { ...current, [key]: val }
+        // view === "posted"
+        setPostedRows((prev) => {
+        const current = prev[i];
+        const next = { ...current, [key]: val };
+
+        // If changing to Free, reimbursed cannot be true
+        if (key === "Got as" && val === "Free") next.Reimbursed = false;
 
         // back to Active
         if (key === "Status" && val !== "Posted" && current.Status === "Posted") {
-          const remaining = prev.filter((_, idx) => idx !== i)
-          const newActive = withIds([...rowsRef.current, next])
-          setRows(newActive)
-          if (loadedRef.current) {
-            setDirty(true)
-            setPostedDirty(true)
-          }
-          persistSheetsNow(newActive, remaining)
-          return remaining
+            const remaining = prev.filter((_, idx) => idx !== i);
+            const newActive = withIds([...rowsRef.current, next]);
+            setRows(newActive);
+            if (loadedRef.current) { setDirty(true); setPostedDirty(true); }
+            persistSheetsNow(newActive, remaining);
+            return remaining;
         }
 
-        const clone = [...prev]
-        clone[i] = next
-        if (loadedRef.current) setPostedDirty(true)
-        return clone
-      })
+        const clone = [...prev];
+        clone[i] = next;
+        if (loadedRef.current) setPostedDirty(true);
+        return clone;
+        });
     }
-  }
+    }
 
   async function saveNow() {
     if (!ssid) return
@@ -552,29 +559,32 @@ export default function Products() {
   const visible = view === "active" ? filteredActive : filteredPosted
 
   /* ---------- export CSV for ACTIVE ---------- */
-  function exportActiveCsv() {
-    const data = filteredActive.length ? filteredActive : rows
+  function exportCsvOfCurrentView() {
+    const data =
+        view === "active"
+        ? (filteredActive.length ? filteredActive : rows)
+        : (filteredPosted.length ? filteredPosted : postedRows);
+
     const lines = [
-      HEADERS.join(","),
-      ...data.map((r) =>
+        HEADERS.join(","),
+        ...data.map((r) =>
         HEADERS.map((h) => {
-          const raw = (r[h] ?? "").toString()
-          const needsQuotes = /[",\n]/.test(raw)
-          const escaped = raw.replace(/"/g, '""')
-          return needsQuotes ? `"${escaped}"` : escaped
-        }).join(","),
-      ),
-    ]
-    const blob = new Blob([lines.join("\n")], {
-      type: "text/csv;charset=utf-8",
-    })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "products-active.csv"
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+            const raw = (r[h] ?? "").toString();
+            const needsQuotes = /[",\n]/.test(raw);
+            const escaped = raw.replace(/"/g, '""');
+            return needsQuotes ? `"${escaped}"` : escaped;
+        }).join(",")
+        ),
+    ];
+
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `products-${view}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    }
 
   /* ---------- KPIs: Purchased vs Free/Reimbursed ---------- */
   const kpi = useMemo(() => {
@@ -702,9 +712,9 @@ export default function Products() {
         <button className="btn" onClick={() => addRow(5)} disabled={view !== "active"}>
           +5
         </button>
-        <button className="btn" onClick={exportActiveCsv} disabled={view !== "active"}>
-          Export CSV
-        </button>
+        <button className="btn" onClick={exportCsvOfCurrentView}>
+            Export CSV
+            </button>
         <button
           className="btn primary"
           disabled={!ssid || saving || savingPosted || (!dirty && !postedDirty)}
@@ -806,57 +816,70 @@ export default function Products() {
                   </select>
                 </td>
                 <td>
-                  <input
+                <input
                     type="date"
                     value={r["Due Date"]}
                     onChange={(e) => update(i, "Due Date", e.target.value)}
                     className={
-                      r.Status !== "Posted" &&
-                      r["Due Date"] &&
-                      r["Due Date"] < todayISO()
+                    r.Status !== "Posted" &&
+                    r["Due Date"] &&
+                    r["Due Date"] < todayISO()
                         ? "input-overdue"
                         : ""
                     }
-                  />
+                />
                 </td>
+
                 <td>
-                  <input
+                <input
                     type="number"
                     step="0.01"
+                    inputMode="decimal"
                     placeholder="0.00"
                     value={r["Cost of Product"]}
                     onChange={(e) => update(i, "Cost of Product", e.target.value)}
+                    onBlur={(e) => update(i, "Cost of Product", clampMoney(e.target.value))}
                     style={{ textAlign: "right" }}
-                  />
+                />
                 </td>
+
                 <td>
-                  <input
+                <input
                     type="number"
                     step="0.01"
+                    inputMode="decimal"
                     placeholder="0.00"
                     value={r["Value (MSRP)"]}
                     onChange={(e) => update(i, "Value (MSRP)", e.target.value)}
+                    onBlur={(e) => update(i, "Value (MSRP)", clampMoney(e.target.value))}
                     style={{ textAlign: "right" }}
-                  />
+                />
                 </td>
+
                 <td>
-                  <select
+                <select
                     value={r["Got as"]}
                     onChange={(e) => update(i, "Got as", e.target.value)}
                     aria-label="Got as"
-                  >
+                >
                     <option>Paid</option>
                     <option>Free</option>
-                  </select>
+                </select>
                 </td>
                 <td style={{ textAlign: "center" }}>
-                  <input
-                    type="checkbox"
-                    checked={isTrue(r.Reimbursed)}
-                    onChange={(e) => update(i, "Reimbursed", e.target.checked)}
-                    title="Mark true when reimbursed"
-                    aria-label="Reimbursed"
-                  />
+                  {(() => {
+                    const gotAsFree = (r["Got as"] || "Paid") === "Free";
+                    return (
+                    <input
+                        type="checkbox"
+                        disabled={gotAsFree}
+                        checked={isTrue(r.Reimbursed)}
+                        onChange={(e) => update(i, "Reimbursed", e.target.checked)}
+                        title={gotAsFree ? "Free items aren't reimbursed" : "Mark true when reimbursed"}
+                        aria-label="Reimbursed"
+                    />
+                    );
+                })()}
                 </td>
                 <td>
                   <div className="cell">
