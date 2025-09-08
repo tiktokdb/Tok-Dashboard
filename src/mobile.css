@@ -1,0 +1,73 @@
+/* ---------- Mobile polish for TokBoard ---------- */
+
+:root {
+  --page-pad: 16px;
+  }
+
+  /* A generic container if you want to wrap pages */
+  .container {
+    max-width: 980px;
+      margin: 0 auto;
+        padding: 0 var(--page-pad);
+        }
+
+        /* Make the KPI cards grid nicely on small screens */
+        .kpis {
+          display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+              gap: 12px;
+              }
+              @media (max-width: 900px) {
+                .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+                }
+                @media (max-width: 520px) {
+                  .kpis { grid-template-columns: 1fr; }
+                  }
+
+                  /* Toolbars: let controls wrap and fill width on phones */
+                  .toolbar {
+                    display: flex;
+                      flex-wrap: wrap;
+                        gap: 8px;
+                          align-items: center;
+                          }
+                          .toolbar .input,
+                          .toolbar .select,
+                          .toolbar .btn {
+                            height: 38px;
+                            }
+                            @media (max-width: 640px) {
+                              .toolbar .input { flex: 1 1 100%; min-width: 100%; }
+                                .toolbar .select { flex: 1 1 calc(50% - 4px); min-width: 180px; }
+                                  .toolbar .btn { flex: 1 1 calc(50% - 4px); min-width: 160px; }
+                                  }
+
+                                  /* Tables: allow side-scroll on small screens */
+                                  .tableWrap {
+                                    overflow-x: auto;
+                                      -webkit-overflow-scrolling: touch;
+                                      }
+                                      .tableWrap table {
+                                        min-width: 860px; /* keep structure; user can scroll on phone */
+                                        }
+
+                                        /* Inputs: prevent iOS zoom-on-focus by using >=16px font */
+                                        input, select, button {
+                                          font-size: 16px;
+                                          }
+
+                                          /* Cards and badges spacing tweaks on tight widths */
+                                          .card.k .v { font-size: 20px; }
+                                          .badge { padding: 2px 8px; border-radius: 999px; }
+
+                                          /* Landing logo sizing on small screens if you give it a class */
+                                          .logo {
+                                            width: 140px;
+                                              height: 140px;
+                                                object-fit: contain;
+                                                  filter: drop-shadow(0 6px 24px rgba(0,0,0,.35));
+                                                  }
+                                                  @media (max-width: 480px) {
+                                                    .logo { width: 110px; height: 110px; }
+                                                    }
+                                                

@@ -134,7 +134,7 @@ export default function LandingPage({ onSignedIn, error }) {
         .features li {
           display: flex;
           gap: 10px;
-          align-items: flex-start;
+          align-items: flex-start; /* <- this is the fix */
           padding: 8px 2px;
           font-size: clamp(14px, 1.8vw, 16px);
         }
