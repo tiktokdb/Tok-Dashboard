@@ -132,7 +132,9 @@ export default function LandingPage({ onSignedIn, error }) {
         }
         .features { list-style: none; margin: 0; padding: 0; }
         .features li {
-          display: flex; gap: 10px; align-items: start;
+          display: flex;
+          gap: 10px;
+          align-items: flex-start;
           padding: 8px 2px;
           font-size: clamp(14px, 1.8vw, 16px);
         }
@@ -198,7 +200,7 @@ export default function LandingPage({ onSignedIn, error }) {
         <section className="hero">
           <ul className="features">
             <li><span className="dot" /> Log products with brand, status, deliverables, due dates, costs, links, and notes.</li>
-            <li><span className="dot" /> Instant KPIs: <b>purchased</b>,<b>unreimbursed</b>,and<b>gifted/reimbursed</b> value.</li>
+            <li><span className="dot" /><span>Instant KPIs: <b>purchased</b>, <b>unreimbursed</b>, and <b>gifted/reimbursed</b> value.</span></li>
             <li><span className="dot" /> <b>Your data stays in your Google account</b> (we don’t store your spreadsheet).</li>
             <li><span className="dot" /> <i>Coming soon:</i> Brand Deals & Requests.</li>
           </ul>
