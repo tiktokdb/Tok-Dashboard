@@ -4,12 +4,13 @@
 
 import React, { useEffect, useState } from "react";
 import { ensureToken, fetchUserEmail } from "./google";
-import { isAllowedEmail, STAN_URL, buildCheckoutUrl } from "./allowlist";
+import { isAllowedEmail, STRIPE_LINK_MONTHLY, STRIPE_LINK_YEARLY } from "./allowlist";
 
 
 export default function LandingPage({ onSignedIn, error }) {
   const [signingIn, setSigningIn] = useState(false);
   const [logoSrc, setLogoSrc] = useState(null);
+  const [notAllowed, setNotAllowed] = useState(false);
 
   // --- Find a logo automatically (public/logo.* or an override) ---
   useEffect(() => {
@@ -45,11 +46,11 @@ export default function LandingPage({ onSignedIn, error }) {
           // NEW: check allowlist
           const ok = await isAllowedEmail(em);
           if (!ok) {
-            // Not on allowlist → send to checkout
-            alert("Access requires an active subscription. Redirecting to checkout…");
-            window.location.href = buildCheckoutUrl(STAN_URL, em);
-            return;
-          }
+             // Not on allowlist → keep them on landing and show pricing
+             setNotAllowed(true);
+             setSigningIn(false);
+             return;
+           }
           // Allowed → proceed
           onSignedIn?.(em);
           setSigningIn(false);
@@ -211,6 +212,19 @@ export default function LandingPage({ onSignedIn, error }) {
         </button>
 
         {error && <p className="err">{error}</p>}
+
+        {notAllowed && (
+          <div style={{ marginTop: 16 }}>
+            <p style={{ color: "#aab3c2" }}>
+              Don’t have access yet? Choose a plan to unlock TokBoard:
+            </p>
+            <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr", maxWidth: 520, margin: "10px auto 0" }}>
+              <a className="cta" style={{ textAlign: "center" }} href={STRIPE_LINK_MONTHLY}>$5.99 / month</a>
+              <a className="cta" style={{ textAlign: "center" }} href={STRIPE_LINK_YEARLY}>$39.99 / year</a>
+            </div>
+            <p className="fine">After checkout, return here and sign in again—access unlocks automatically once your email is on the allowlist.</p>
+          </div>
+        )}
 
         <p className="fine">
           Founding price planned: <b>$19.99/year</b> (regular <b>$29.99/year</b>).

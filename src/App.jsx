@@ -4,7 +4,7 @@ import { initGoogle, fetchUserEmail } from "./google";
 import LandingPage from "./LandingPage";
 import Dashboard from "./Dashboard";
 import { GOOGLE_CLIENT_ID, GOOGLE_API_KEY, GOOGLE_SCOPES } from "./config";
-import { isAllowedEmail, STAN_URL } from "./allowlist";
+import { isAllowedEmail } from "./allowlist";
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -35,7 +35,7 @@ export default function App() {
   }, []);
 
   // --- helper: clear token + bounce to checkout ---
-  function signOutAndRedirect() {
+  function signOut() {
     try { window.gapi?.client?.setToken(null); } catch {}
     sessionStorage.removeItem("tokboard_token");
     sessionStorage.removeItem("tokboard_ssid");
@@ -49,8 +49,8 @@ export default function App() {
     // Guard with allowlist every time
     const ok = await isAllowedEmail(em);
     if (!ok) {
-      alert("Access requires an active subscription. Redirecting to checkout…");
-      signOutAndRedirect();
+      alert("Access requires an active subscription. Please choose a plan on the landing page.");
++     signOut();
       return;
     }
     setEmail(em);
@@ -98,10 +98,9 @@ export default function App() {
           // ALLOWLIST right here at boot
           const ok = await isAllowedEmail(em);
           if (!ok) {
-            alert("Access requires an active subscription. Redirecting to checkout…");
-            signOutAndRedirect();
-            return;
-          }
+             signOut(); // LandingPage will render and show pricing
+             return;
+           }
           setEmail(em);
           setLicensed(true);
         }

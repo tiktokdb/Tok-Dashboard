@@ -2,10 +2,12 @@
 import { GOOGLE_API_KEY } from "./config";
 
 const SSID = import.meta.env.VITE_ALLOWLIST_SSID || "";
-export const STAN_URL = import.meta.env.VITE_STAN_URL || "https://stan.store/";
 
 const TTL_MS = 5 * 60 * 1000; // cache 5 min
 const CACHE_KEY = "tokboard_allowlist_v1";
+
+export const STRIPE_LINK_MONTHLY = import.meta.env.VITE_STRIPE_LINK_MONTHLY || "";
+export const STRIPE_LINK_YEARLY  = import.meta.env.VITE_STRIPE_LINK_YEARLY  || "";
 
 /* Gmail-safe normalization + lowercasing */
 function normEmail(e) {
@@ -73,14 +75,4 @@ export async function isAllowedEmail(email) {
   if (!SSID) return true;  // if no sheet configured, allow everyone
   const list = await fetchAllowlist();
   return matchAllowed(email, list);
-}
-
-export function buildCheckoutUrl(base, email) {
-  try {
-    const u = new URL(base);
-    if (email) u.searchParams.set("email", email);
-    return u.toString();
-  } catch {
-    return base;
-  }
 }
