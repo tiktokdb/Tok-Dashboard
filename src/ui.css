@@ -82,8 +82,22 @@ html,body,#root{
 }
 
 /* Table */
-.tableWrap.card { overflow: visible !important; }  /* let tooltips escape the card */
+/* OUTER card: allow horizontal scroll instead of spilling */
+.tableWrap.card {
+  overflow-x: auto;      /* 👈 scroll inside the card if table is wider */
+  overflow-y: visible;   /* keep tooltips and sticky headers visible */
+  position: relative;
+  z-index: 1;
+}
 .tableWrap { position: relative; z-index: 1; }
+
+.tableWrap.card::-webkit-scrollbar {
+  height: 8px;
+}
+.tableWrap.card::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.12);
+  border-radius: 4px;
+}
 
 .tableWrap .tableWrapInner { position: relative; } /* optional if you use an inner wrap */
 
