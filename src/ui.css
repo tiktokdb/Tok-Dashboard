@@ -125,6 +125,22 @@ th{
 .tableWrap thead th:hover{ z-index:3; } /* raise hovered header */
 
 td .cell{ display:flex; align-items:center; gap:8px }
+/* Force layout: input expands, icon stays auto width */
+.tableWrap td:nth-child(6) .cell,
+.tableWrap td:nth-child(7) .cell {
+  display: grid;
+  grid-template-columns: 1fr auto;  /* input takes remaining space */
+  align-items: center;
+  gap: 8px;
+}
+
+/* Make the input actually fill */
+.tableWrap td:nth-child(6) .cell input,
+.tableWrap td:nth-child(7) .cell input {
+  min-width: 0;
+  width: 100%;
+}
+
 /* allow children to shrink inside flex cells */
 td .cell > * { min-width: 0; }
 
