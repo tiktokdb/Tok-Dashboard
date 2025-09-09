@@ -172,6 +172,57 @@ export default function LandingPage({ onSignedIn, error }) {
           .hero { border-radius: 16px; }
           .logoBox { border-radius: 18px; }
         }
+
+        /* --- Sneak Peek gallery --- */
+        .peek { 
+          margin: 28px auto 8px; 
+          text-align: center; 
+          max-width: 980px; 
+        }
+        .peek-title {
+          font-size: clamp(22px, 3.2vw, 28px);
+          font-weight: 900;
+          margin: 0 0 4px;
+          background: linear-gradient(180deg, #fff, #bcd2ff);
+          -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+        .peek-sub { 
+          color: #aab3c2; 
+          margin: 0 0 16px; 
+          font-size: 14px; 
+        }
+        .peek-grid {
+          display: grid; 
+          gap: 14px; 
+          grid-template-columns: repeat(3, 1fr);
+        }
+        @media (max-width: 900px) { .peek-grid { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 560px) { .peek-grid { grid-template-columns: 1fr; } }
+
+        .peek-card {
+          margin: 0; 
+          padding: 10px; 
+          border-radius: 14px;
+          border: 1px solid rgba(255,255,255,.08);
+          background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+          box-shadow: 0 14px 36px rgba(0,0,0,.35);
+          transition: transform .14s ease, box-shadow .14s ease, filter .14s ease;
+        }
+        .peek-card:hover { 
+          transform: translateY(-2px); 
+          box-shadow: 0 20px 48px rgba(0,0,0,.45); 
+          filter: brightness(1.03);
+        }
+        .peek-card img { 
+          width: 100%; 
+          border-radius: 10px; 
+          display: block; 
+        }
+        .peek-card figcaption { 
+          margin-top: 8px; 
+          font-size: 13px; 
+          color: #93a0b5; 
+        }
       `}</style>
 
       <div className="fx" aria-hidden="true" />
@@ -207,6 +258,29 @@ export default function LandingPage({ onSignedIn, error }) {
           </ul>
         </section>
 
+        {/* --- Sneak Peek --- */}
+        <section className="peek">
+          <h2 className="peek-title">Sneak peek</h2>
+          <p className="peek-sub">A quick look at KPIs, filters, and the tracker table.</p>
+
+          <div className="peek-grid">
+            <figure className="peek-card">
+              <img loading="lazy" src="/tokboard_crop_kpis.png" alt="TokBoard KPI cards" />
+              <figcaption>At-a-glance KPIs</figcaption>
+            </figure>
+
+            <figure className="peek-card">
+              <img loading="lazy" src="/tokboard_crop_filters.png" alt="TokBoard filters and actions" />
+              <figcaption>Filters & quick actions</figcaption>
+            </figure>
+
+            <figure className="peek-card">
+              <img loading="lazy" src="/tokboard_crop_table.png" alt="TokBoard product tracker table" />
+              <figcaption>Product tracker table</figcaption>
+            </figure>
+          </div>
+        </section>
+
         <button className="cta" onClick={handleSignInClick} disabled={signingIn}>
           {signingIn ? "Redirecting…" : "Sign in with Google"}
         </button>
@@ -215,7 +289,7 @@ export default function LandingPage({ onSignedIn, error }) {
         <p className="fine" style={{ marginTop: "12px", color: "#fbbf24" }}>
           ⚠️ First time signing in? Google may show a warning that says 
           <i>“Google hasn’t verified this app.”</i><br />
-          Just click <b>Advanced → Go to tok-dashboard.onrender.com (unsafe)</b> 
+          Just click <b>Advanced → Go to tok-dashboard.onrender.com (unsafe)</b>
           to continue. You’ll only need to do this once while we’re waiting 
           on Google’s verification.
         </p>
