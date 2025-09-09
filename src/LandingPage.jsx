@@ -211,6 +211,15 @@ export default function LandingPage({ onSignedIn, error }) {
           {signingIn ? "Redirecting…" : "Sign in with Google"}
         </button>
 
+        {/* NEW: info about the unverified app screen */}
+        <p className="fine" style={{ marginTop: "12px", color: "#fbbf24" }}>
+          ⚠️ First time signing in? Google may show a warning that says 
+          <i>“Google hasn’t verified this app.”</i><br />
+          Just click <b>Advanced → Go to tok-dashboard.onrender.com (unsafe)</b> 
+          to continue. You’ll only need to do this once while we’re waiting 
+          on Google’s verification.
+        </p>
+
         {error && <p className="err">{error}</p>}
 
         {notAllowed && (
