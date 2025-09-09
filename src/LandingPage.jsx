@@ -253,29 +253,32 @@ export default function LandingPage({ onSignedIn, error }) {
 
         /* --- Lightbox overlay --- */
         .lightbox {
-          position: fixed; inset: 0; z-index: 50;
-          background: rgba(0,0,0,.55);
-          backdrop-filter: blur(4px);
-          display: grid; place-items: center;
-          padding: 24px;
-        }
-        .lightbox-content {
-          position: relative;
-          max-width: min(1100px, 96vw);
-          width: 100%;
-          background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
-          border: 1px solid rgba(255,255,255,.10);
-          border-radius: 16px;
-          box-shadow: 0 30px 80px rgba(0,0,0,.55);
-          padding: 18px 54px; /* room for arrows */
-        }
-        .lightbox-img {
-          width: 100%; height: auto; display: block;
-          border-radius: 10px;
-        }
-        .lightbox-caption {
-          margin-top: 10px; text-align: center; color: #aab3c2; font-size: 14px;
-        }
+        position: fixed; inset: 0; z-index: 50;
+        background: rgba(0,0,0,.70);           /* darker backdrop for contrast */
+        backdrop-filter: blur(4px);
+        display: grid; place-items: center;
+        padding: 16px;
+      }
+      .lightbox-content {
+        position: relative;
+        max-width: min(1400px, 98vw);           /* wider container */
+        max-height: 90vh;                        /* keep on screen */
+        width: 100%;
+        overflow: hidden;                        /* needed for zoom */
+        background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 16px;
+        box-shadow: 0 30px 80px rgba(0,0,0,.65);
+        padding: 12px 54px;                      /* a bit less padding = more room */
+      }
+      .lightbox-img {
+        display: block;
+        margin: 0 auto;
+        max-width: 100%;
+        height: auto;
+        max-height: 78vh;                        /* grow to tall, stay readable */
+        border-radius: 10px;
+      }
 
         /* Close + nav buttons */
         .lightbox-close {
