@@ -41,7 +41,6 @@ export default function App() {
     sessionStorage.removeItem("tokboard_ssid");
     setEmail(null);
     setLicensed(false);
-    window.location.href = STAN_URL;
   }
 
   // --- called by LandingPage after Google sign-in completes ---
