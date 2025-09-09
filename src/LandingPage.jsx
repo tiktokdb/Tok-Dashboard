@@ -12,6 +12,29 @@ export default function LandingPage({ onSignedIn, error }) {
   const [logoSrc, setLogoSrc] = useState(null);
   const [notAllowed, setNotAllowed] = useState(false);
 
+  // --- Lightbox state + data ---
+  const [lightboxIndex, setLightboxIndex] = useState/** @type {number|null} */(null);
+
+  const peekImages = [
+    { src: "/tokboard_crop_kpis.png",    alt: "TokBoard KPI cards",               caption: "At-a-glance KPIs" },
+    { src: "/tokboard_crop_filters.png", alt: "TokBoard filters & quick actions", caption: "Filters & quick actions" },
+    { src: "/tokboard_crop_table.png",   alt: "TokBoard product tracker table",   caption: "Product tracker table" },
+  ];
+
+  const imgCount = peekImages.length;
+
+  // Keyboard controls when lightbox is open: ESC to close, ←/→ to navigate
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") setLightboxIndex(null);
+      if (e.key === "ArrowRight") setLightboxIndex((i) => (i + 1) % imgCount);
+      if (e.key === "ArrowLeft")  setLightboxIndex((i) => (i - 1 + imgCount) % imgCount);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightboxIndex, imgCount]);
+
   // --- Find a logo automatically (public/logo.* or an override) ---
   useEffect(() => {
     const base = (import.meta?.env?.BASE_URL || "/").replace(/\/+$/, "") + "/";
@@ -223,6 +246,55 @@ export default function LandingPage({ onSignedIn, error }) {
           font-size: 13px; 
           color: #93a0b5; 
         }
+
+        /* Make cards feel clickable */
+        .peek-card { cursor: zoom-in; }
+        .peek-card:focus { outline: 2px solid rgba(124,58,237,.6); outline-offset: 2px; }
+
+        /* --- Lightbox overlay --- */
+        .lightbox {
+          position: fixed; inset: 0; z-index: 50;
+          background: rgba(0,0,0,.55);
+          backdrop-filter: blur(4px);
+          display: grid; place-items: center;
+          padding: 24px;
+        }
+        .lightbox-content {
+          position: relative;
+          max-width: min(1100px, 96vw);
+          width: 100%;
+          background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+          border: 1px solid rgba(255,255,255,.10);
+          border-radius: 16px;
+          box-shadow: 0 30px 80px rgba(0,0,0,.55);
+          padding: 18px 54px; /* room for arrows */
+        }
+        .lightbox-img {
+          width: 100%; height: auto; display: block;
+          border-radius: 10px;
+        }
+        .lightbox-caption {
+          margin-top: 10px; text-align: center; color: #aab3c2; font-size: 14px;
+        }
+
+        /* Close + nav buttons */
+        .lightbox-close {
+          position: absolute; top: 8px; right: 10px;
+          width: 36px; height: 36px; border-radius: 10px;
+          background: rgba(15,18,32,.7);
+          color: #e8ebf1; border: 1px solid rgba(255,255,255,.12);
+          font-size: 22px; line-height: 32px; cursor: pointer;
+        }
+        .lightbox-nav {
+          position: absolute; top: 50%; transform: translateY(-50%);
+          width: 42px; height: 42px; border-radius: 999px;
+          background: rgba(15,18,32,.72);
+          color: #e8ebf1; border: 1px solid rgba(255,255,255,.12);
+          font-size: 26px; line-height: 36px; cursor: pointer;
+        }
+        .lightbox-nav.prev { left: 10px; }
+        .lightbox-nav.next { right: 10px; }
+        .lightbox-close:hover, .lightbox-nav:hover { filter: brightness(1.08); }
       `}</style>
 
       <div className="fx" aria-hidden="true" />
@@ -258,28 +330,27 @@ export default function LandingPage({ onSignedIn, error }) {
           </ul>
         </section>
 
-        {/* --- Sneak Peek --- */}
         <section className="peek">
-          <h2 className="peek-title">Sneak peek</h2>
-          <p className="peek-sub">A quick look at KPIs, filters, and the tracker table.</p>
+        <h2 className="peek-title">Sneak peek</h2>
+        <p className="peek-sub">A quick look at KPIs, filters, and the tracker table.</p>
 
-          <div className="peek-grid">
-            <figure className="peek-card">
-              <img loading="lazy" src="/tokboard_crop_kpis.png" alt="TokBoard KPI cards" />
-              <figcaption>At-a-glance KPIs</figcaption>
+        <div className="peek-grid">
+          {peekImages.map((img, i) => (
+            <figure
+              key={i}
+              className="peek-card"
+              onClick={() => setLightboxIndex(i)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setLightboxIndex(i)}
+              aria-label={`Open preview: ${img.caption}`}
+            >
+              <img loading="lazy" src={img.src} alt={img.alt} />
+              <figcaption>{img.caption}</figcaption>
             </figure>
-
-            <figure className="peek-card">
-              <img loading="lazy" src="/tokboard_crop_filters.png" alt="TokBoard filters and actions" />
-              <figcaption>Filters & quick actions</figcaption>
-            </figure>
-
-            <figure className="peek-card">
-              <img loading="lazy" src="/tokboard_crop_table.png" alt="TokBoard product tracker table" />
-              <figcaption>Product tracker table</figcaption>
-            </figure>
-          </div>
-        </section>
+          ))}
+        </div>
+      </section>
 
         <button className="cta" onClick={handleSignInClick} disabled={signingIn}>
           {signingIn ? "Redirecting…" : "Sign in with Google"}
@@ -315,6 +386,53 @@ export default function LandingPage({ onSignedIn, error }) {
           <a href="/terms.html" target="_blank" rel="noopener noreferrer">Terms</a>
         </p>
       </div>
+
+      {lightboxIndex !== null && (
+        <div
+          className="lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image preview"
+          onClick={() => setLightboxIndex(null)}
+        >
+          <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="lightbox-close"
+              onClick={() => setLightboxIndex(null)}
+              aria-label="Close"
+            >
+              {"X"}
+            </button>
+
+            <button
+              className="lightbox-nav prev"
+              onClick={() => setLightboxIndex((i) => (i - 1 + peekImages.length) % peekImages.length)}
+              aria-label="Previous"
+            >
+              {"<"}
+            </button>
+
+            <img
+              className="lightbox-img"
+              src={peekImages[lightboxIndex].src}
+              alt={peekImages[lightboxIndex].alt}
+            />
+
+            <div className="lightbox-caption">
+              {peekImages[lightboxIndex].caption}
+            </div>
+
+            <button
+              className="lightbox-nav next"
+              onClick={() => setLightboxIndex((i) => (i + 1) % peekImages.length)}
+              aria-label="Next"
+            >
+              {">"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
