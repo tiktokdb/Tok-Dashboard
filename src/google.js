@@ -150,7 +150,7 @@ export async function findOrCreateSpreadsheet() {
   creatingPromise = (async () => {
     console.log("📂 Looking for existing TokBoard spreadsheet...")
     const q =
-      "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false and appProperties has { key='tokdashboard' and value='1' }"
+      "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false and appProperties has { key='tokdashboard_v2' and value='1' }"
     const list = await window.gapi.client.drive.files.list({
       q,
       fields: "files(id,name)",
@@ -168,7 +168,7 @@ export async function findOrCreateSpreadsheet() {
       resource: {
         name: "TokBoard",
         mimeType: "application/vnd.google-apps.spreadsheet",
-        appProperties: { tokdashboard: "1" },
+        appProperties: { tokdashboard_v2: "1" },
       },
       fields: "id",
     })
