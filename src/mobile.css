@@ -6,10 +6,17 @@
 
   /* A generic container if you want to wrap pages */
   .container {
-    max-width: 768px;
-      margin: 0 auto;
-        padding: 0 var(--page-pad);
-        }
+    width: 100%;          /* always take full width */
+    max-width: 1500px;    /* optional cap, matches your .page width */
+    margin: 0 auto;
+    padding: 0 var(--page-pad);
+  }
+
+  @media (max-width: 900px) {
+    .container {
+      max-width: 100%;    /* on smaller screens, let it shrink naturally */
+    }
+  }
 
         /* Make the KPI cards grid nicely on small screens */
         .kpis {

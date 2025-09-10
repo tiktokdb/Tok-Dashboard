@@ -1,6 +1,6 @@
 // src/tabs/Products.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react"
-import { findOrCreateSpreadsheet, readTab } from "../google"
+import { readTab } from "../google"
 
 /* ------------ constants ------------ */
 const STATUSES = ["Incoming", "Reviewing", "Filming", "Posted"]
@@ -9,6 +9,26 @@ const ACTIVE_TAB = "Products"
 const POSTED_TAB = "Posted"
 const isHttp = (s) => /^https?:\/\//i.test((s || "").trim())
 const todayISO = () => new Date().toISOString().slice(0, 10)
+
+// --- debounce + in-flight de-dupe helpers ---
+const MOUNT_STABILIZE_MS = 250; // wait before hitting Sheets on mount
+const _inFlight = new Map();
+const delay = (ms) => new Promise(r => setTimeout(r, ms));
+const withRetry = async (fn, retries = 1) => {
+  let err;
+  for (let i = 0; i <= retries; i++) {
+    try { return await fn(); } catch (e) { err = e; if (i < retries) await delay(300); }
+  }
+  throw err;
+};
+function readTabDedup(ssid, title) {
+  const key = `${ssid}::${title}`;
+  if (_inFlight.has(key)) return _inFlight.get(key);
+  const p = readTab(ssid, title).finally(() => _inFlight.delete(key));
+  _inFlight.set(key, p);
+  return p;
+}
+
 
 /* money + boolean helpers */
 const money = (v) => {
@@ -34,6 +54,15 @@ const clampMoney = (v) => {
   return n < 0 ? 0 : +n.toFixed(2);
 };
 
+const formatCurrency = (v) => {
+  const n = money(v);
+  if (!n) return "";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+  }).format(n);
+};
 
 /* ------------ row shape (uses simplified Got as + Reimbursed) ------------ */
 function newRow() {
@@ -103,7 +132,7 @@ const HEADERS = [
 
 async function ensureSheetExists(ssid, title) {
   try {
-    await readTab(ssid, title)
+    await readTabDedup(ssid, title)
   } catch {
     try {
       await window.gapi.client.sheets.spreadsheets.batchUpdate({
@@ -239,8 +268,7 @@ function ConfirmModal({ open, name, onConfirm, onCancel }) {
 }
 
 /* =================== Component =================== */
-export default function Products() {
-  const [ssid, setSsid] = useState(null)
+  export default function Products({ ssid }) {
 
   // Active rows (not posted)
   const [rows, setRows] = useState([])
@@ -278,39 +306,57 @@ export default function Products() {
   const loadedRef = useRef(false)
 
   /* ---------- initial load ---------- */
-  useEffect(() => {
-    ;(async () => {
-      setLoading(true)
-      try {
-        const id = await findOrCreateSpreadsheet()
-        setSsid(id)
-        await ensureSheetExists(id, ACTIVE_TAB)
-        await ensureSheetExists(id, POSTED_TAB)
+useEffect(() => {
+  if (!ssid) return;
 
-        const active = await readTab(id, ACTIVE_TAB)
-        const posted = await readTab(id, POSTED_TAB)
+  let cancelled = false;
+  const loadId = Math.random().toString(36).slice(2);
 
-        const normActive = withIds(
-          (active.length ? active : []).map((r) => ({ ...newRow(), ...r })),
-        )
-        const normPosted = withIds(
-          dedupeBySig(
-            (posted.length ? posted : []).map((r) => ({ ...newRow(), ...r })),
-          ),
-        )
+  // Debounce: don’t hit Sheets if the tab is flipped away immediately
+  const timer = setTimeout(async () => {
+    if (cancelled) return;
+    console.log("🟦 Products load START", loadId, ssid);
+    setLoading(true);
+    setError(null);
 
-        setRows(normActive)
-        setPostedRows(normPosted)
-        if (normPosted.length !== posted.length) setPostedDirty(true)
-      } catch (e) {
-        console.error("❌ Load failed:", e)
-        setError(e?.message || "Failed to load Products")
-      } finally {
-        setLoading(false)
-        loadedRef.current = true
+    try {
+      await ensureSheetExists(ssid, ACTIVE_TAB);
+      await ensureSheetExists(ssid, POSTED_TAB);
+
+      const [active, posted] = await Promise.all([
+        withRetry(() => readTabDedup(ssid, ACTIVE_TAB), 1),
+        withRetry(() => readTabDedup(ssid, POSTED_TAB), 1),
+      ]);
+
+      if (cancelled) return;
+
+      const normActive = withIds((active.length ? active : []).map(r => ({ ...newRow(), ...r })));
+      const normPosted = withIds(dedupeBySig((posted.length ? posted : []).map(r => ({ ...newRow(), ...r }))));
+
+      setRows(normActive);
+      setPostedRows(normPosted);
+      if (normPosted.length !== posted.length) setPostedDirty(true);
+
+      console.log("🟩 Products load DONE", loadId, { rows: normActive.length, posted: normPosted.length });
+    } catch (e) {
+      if (!cancelled) {
+        console.error("❌ Products load FAILED", loadId, e);
+        setError(e?.message || "Failed to load Products");
       }
-    })()
-  }, [])
+    } finally {
+      if (!cancelled) {
+        setLoading(false);
+        loadedRef.current = true;
+      }
+    }
+  }, MOUNT_STABILIZE_MS);
+
+  return () => {
+    cancelled = true;
+    clearTimeout(timer);
+    console.log("🟥 Products load CANCEL", loadId);
+  };
+}, [ssid]);
 
   /* ---------- immediate sheet writer (used on cross-moves & deletes) ---------- */
   async function persistSheetsNow(nextActive, nextPosted) {
@@ -767,8 +813,26 @@ export default function Products() {
                 </span>
                 </th>
                 <th>Due</th>
-                <th>Cost</th>
-                <th>Value (MSRP)</th>
+                <th>
+                Cost
+                <span className="th-help" aria-label="What is Cost?">
+                  <span className="th-tip">
+                    Your out-of-pocket cost for this product. <br/>
+                    • If reimbursed, also mark the Reimbursed box. <br/>
+                    • Use 0.00 for gifted items.
+                  </span>
+                </span>
+              </th>
+              <th>
+                Value (MSRP)
+                <span className="th-help" aria-label="What is Value (MSRP)?">
+                  <span className="th-tip">
+                    The product’s retail value (manufacturer’s suggested price). <br/>
+                    • Used for reporting gifted/reimbursed value. <br/>
+                    • Example: if free $200 headphones, enter 200.00 here.
+                  </span>
+                </span>
+              </th>
                 <th>Got as</th>
                 <th>Reimbursed</th>
                 <th>Link</th>
@@ -832,29 +896,47 @@ export default function Products() {
 
                 <td>
                 <input
-                    type="number"
-                    step="0.01"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={r["Cost of Product"]}
-                    onChange={(e) => update(i, "Cost of Product", e.target.value)}
-                    onBlur={(e) => update(i, "Cost of Product", clampMoney(e.target.value))}
-                    style={{ textAlign: "right" }}
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="$0.00"
+                  value={r["Cost of Product"]}
+                  onChange={(e) => update(i, "Cost of Product", e.target.value)}
+                  onBlur={(e) => {
+                    const clamped = clampMoney(e.target.value);
+                    update(i, "Cost of Product", formatCurrency(clamped));
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const clamped = clampMoney(e.target.value);
+                      update(i, "Cost of Product", formatCurrency(clamped));
+                      e.target.blur(); // trigger blur styling
+                    }
+                  }}
+                  style={{ textAlign: "right" }}
                 />
-                </td>
+              </td>
 
-                <td>
-                <input
-                    type="number"
-                    step="0.01"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={r["Value (MSRP)"]}
-                    onChange={(e) => update(i, "Value (MSRP)", e.target.value)}
-                    onBlur={(e) => update(i, "Value (MSRP)", clampMoney(e.target.value))}
-                    style={{ textAlign: "right" }}
-                />
-                </td>
+              <td>
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="$0.00"
+                value={r["Value (MSRP)"]}
+                onChange={(e) => update(i, "Value (MSRP)", e.target.value)}
+                onBlur={(e) => {
+                  const clamped = clampMoney(e.target.value);
+                  update(i, "Value (MSRP)", formatCurrency(clamped));
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const clamped = clampMoney(e.target.value);
+                    update(i, "Value (MSRP)", formatCurrency(clamped));
+                    e.target.blur();
+                  }
+                }}
+                style={{ textAlign: "right" }}
+              />
+            </td>
 
                 <td>
                 <select

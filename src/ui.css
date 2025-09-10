@@ -322,3 +322,66 @@ td input[type="number"] { text-align: right; }
   margin-left: 6px; 
   transform: translateY(-1px);
 }
+
+.badge.primary { color: var(--primary); }
+.badge.primary-2 { color: var(--primary-2); }
+
+/* Style textareas like inputs */
+td textarea {
+  width: 100%;
+  background: rgba(255,255,255,.05);
+  border: 1px solid var(--stroke);
+  color: var(--text);
+  padding: 10px;
+  border-radius: 10px;
+  outline: none;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+td textarea:focus {
+  box-shadow: 0 0 0 4px var(--ring);
+  border-color: transparent;
+}
+
+/* Saving indicator in toolbar */
+.toolbar .muted {
+  margin-left: auto;   /* push to the far right */
+  font-size: 12px;
+}
+
+.kpis .card.k {
+  min-height: 120px; /* adjust until it matches Products */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* ===== Column widths (BrandDeals table) ===== */
+
+/* Brand Deals: Notes column */
+.brandTable th:nth-child(9),
+.brandTable td:nth-child(9) {
+  min-width: 200px;   /* readable minimum */
+  max-width: 300px;   /* prevent it from expanding too far */
+  width: 1%;          /* let it shrink if space is tight */
+}
+
+.brandTable td:nth-child(9) textarea {
+  width: 100%;
+  resize: vertical;   /* only allow vertical resize, not horizontal */
+  box-sizing: border-box;
+}
+
+
+.tableWrap th:nth-child(1), .tableWrap td:nth-child(1) { min-width: 160px; }  /* Brand/Company */
+.tableWrap th:nth-child(2), .tableWrap td:nth-child(2) { min-width: 220px; }  /* Campaign/Deal Name */
+.tableWrap th:nth-child(3), .tableWrap td:nth-child(3) { min-width: 160px; }  /* Source */
+.tableWrap th:nth-child(4), .tableWrap td:nth-child(4) { width: 120px; text-align: right;} /* Payment */
+.tableWrap th:nth-child(5), .tableWrap td:nth-child(5) { min-width: 140px; }  /* Payment Type */
+.tableWrap th:nth-child(6), .tableWrap td:nth-child(6) { min-width: 160px; }  /* Status */
+.tableWrap th:nth-child(7), .tableWrap td:nth-child(7) { min-width: 150px; }  /* Due Date */
+.tableWrap th:nth-child(8), .tableWrap td:nth-child(8) { min-width: 160px; }  /* Deliverables */
+.tableWrap th:nth-child(9), .tableWrap td:nth-child(9) { min-width: 200px; }  /* Notes */
+.tableWrap th:nth-child(10), .tableWrap td:nth-child(10) { width: 64px; }     /* Actions */

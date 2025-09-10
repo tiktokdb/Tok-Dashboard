@@ -1,6 +1,6 @@
 // src/App.jsx
 import React, { useEffect, useState } from "react";
-import { initGoogle, fetchUserEmail } from "./google";
+import { initGoogle, fetchUserEmail, findOrCreateSpreadsheet } from "./google";
 import LandingPage from "./LandingPage";
 import Dashboard from "./Dashboard";
 import { GOOGLE_CLIENT_ID, GOOGLE_API_KEY, GOOGLE_SCOPES } from "./config";
@@ -12,6 +12,7 @@ export default function App() {
   const [licensed, setLicensed] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [error, setError] = useState(null);
+  const [ssid, setSsid] = useState(null);
 
   // --- init Google ---
   useEffect(() => {
@@ -41,19 +42,23 @@ export default function App() {
     sessionStorage.removeItem("tokboard_ssid");
     setEmail(null);
     setLicensed(false);
+    setSsid(null);
   }
 
   // --- called by LandingPage after Google sign-in completes ---
   async function handleSignedIn(em) {
-    // Guard with allowlist every time
     const ok = await isAllowedEmail(em);
     if (!ok) {
       alert("Access requires an active subscription. Please choose a plan on the landing page.");
-+     signOut();
+      signOut();
       return;
     }
     setEmail(em);
     setLicensed(true);
+
+    // ✅ always find/create sheet at login
+    const id = await findOrCreateSpreadsheet();
+    setSsid(id);
   }
 
   function handleSignOut() {
@@ -62,6 +67,7 @@ export default function App() {
     sessionStorage.removeItem("tokboard_ssid");
     setEmail(null);
     setLicensed(false);
+    setSsid(null);
   }
 
   // --- boot-time auth check: restore token, resolve user, THEN allowlist-check ---
@@ -102,6 +108,10 @@ export default function App() {
            }
           setEmail(em);
           setLicensed(true);
+
+           // ✅ also create/find spreadsheet on restore
+          const id = await findOrCreateSpreadsheet();
+          setSsid(id);
         }
       } catch (e) {
         console.log("auth boot check:", e);
@@ -114,5 +124,5 @@ export default function App() {
   if (!ready || !authChecked) return <p>Loading…</p>;
   if (!email) return <LandingPage onSignedIn={handleSignedIn} error={error} />;
   if (email && !licensed) return <p>Your email is not on the allowlist yet.</p>;
-  return <Dashboard email={email} onSignOut={handleSignOut} />;
+  return <Dashboard email={email} ssid={ssid} onSignOut={handleSignOut} />;
 }

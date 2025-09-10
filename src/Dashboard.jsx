@@ -1,18 +1,22 @@
 import React, { useMemo, useState } from "react"
 import Products from "./tabs/Products"
+import BrandDeals from "./tabs/BrandDeals"
 
 const TABS = [
   { key: "products", label: "Products" },
-  { key: "branddeals", label: "Brand Deals", coming: true },
+  { key: "branddeals", label: "Brand Deals" },
   { key: "requests", label: "Requests", coming: true },
   { key: "times", label: "Posting Times", coming: true },
 ]
 
-export default function Dashboard({ email, onSignOut }) {
+export default function Dashboard({ email, ssid, onSignOut }) {
   const [tab, setTab] = useState("products")
   const TabComp = useMemo(() => {
     switch (tab) {
       case "products":
+        return Products
+      case "branddeals":
+        return BrandDeals // ✅ now it loads your new tab
       default:
         return Products
     }
@@ -47,7 +51,7 @@ export default function Dashboard({ email, onSignOut }) {
 
       {/* Active tab */}
       <div className="page">
-        <TabComp email={email} />
+        <TabComp email={email} ssid={ssid} />
       </div>
     </>
   )

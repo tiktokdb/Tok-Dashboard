@@ -135,89 +135,155 @@ export async function fetchUserEmail() {
   return (data.email || "").toLowerCase()
 }
 
+let creatingPromise = null
+
 export async function findOrCreateSpreadsheet() {
-  // ✅ 1) Try cache first
+  // if one call is already creating, wait for it
+  if (creatingPromise) return creatingPromise
+
   const cached = sessionStorage.getItem("tokboard_ssid")
   if (cached) {
     console.log("🗂️ Using cached spreadsheet ID:", cached)
     return cached
   }
 
-  console.log("📂 Looking for existing TokBoard spreadsheet...")
-  const q =
-    "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false and appProperties has { key='tokdashboard' and value='1' }"
-  const list = await window.gapi.client.drive.files.list({
-    q,
-    fields: "files(id,name)",
-  })
-
-  if (list.result.files && list.result.files.length) {
-    const ssid = list.result.files[0].id
-    console.log("✅ Found existing spreadsheet:", ssid)
-    sessionStorage.setItem("tokboard_ssid", ssid) // <— cache it
-    return ssid
-  }
-
-  console.log("📄 No spreadsheet found, creating new one...")
-  const created = await window.gapi.client.drive.files.create({
-    resource: {
-      name: "TokBoard",
-      mimeType: "application/vnd.google-apps.spreadsheet",
-      appProperties: { tokdashboard: "1" },
-    },
-    fields: "id",
-  })
-
-  const ssid = created.result.id
-  console.log("✅ New spreadsheet created:", ssid)
-  sessionStorage.setItem("tokboard_ssid", ssid) // <— cache it
-
-  const parts = [
-    ["Products", ["Product", "Cost of Product", "Note"]],
-    ["Brand Deals", ["Studio Invite", "Paid Amount", "Reason", "Date", "Status"]],
-    ["Requests", ["Company", "Product", "Collab Message", "Request", "Ad Code Sent", "Notes"]],
-    ["Posting Times", ["Day of the Week", "Best Time to Post"]],
-  ]
-
-  for (const [title, headers] of parts) {
-    try {
-      await window.gapi.client.sheets.spreadsheets.batchUpdate({
-        spreadsheetId: ssid,
-        resource: { requests: [{ addSheet: { properties: { title } } }] },
-      })
-      console.log(`✅ Sheet '${title}' created`)
-    } catch (e) {
-      console.log(`ℹ️ Sheet '${title}' may already exist`, e.message)
-    }
-    await window.gapi.client.sheets.spreadsheets.values.update({
-      spreadsheetId: ssid,
-      range: `'${title}'!A1`,
-      valueInputOption: "RAW",
-      resource: { values: [headers] },
+  creatingPromise = (async () => {
+    console.log("📂 Looking for existing TokBoard spreadsheet...")
+    const q =
+      "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false and appProperties has { key='tokdashboard' and value='1' }"
+    const list = await window.gapi.client.drive.files.list({
+      q,
+      fields: "files(id,name)",
     })
-    console.log(`✅ Headers set for '${title}'`)
-  }
 
-  return ssid
+    if (list.result.files && list.result.files.length) {
+      const ssid = list.result.files[0].id
+      console.log("✅ Found existing spreadsheet:", ssid)
+      sessionStorage.setItem("tokboard_ssid", ssid)
+      return ssid
+    }
+
+    console.log("📄 No spreadsheet found, creating new one...")
+    const created = await window.gapi.client.drive.files.create({
+      resource: {
+        name: "TokBoard",
+        mimeType: "application/vnd.google-apps.spreadsheet",
+        appProperties: { tokdashboard: "1" },
+      },
+      fields: "id",
+    })
+
+    const ssid = created.result.id
+    console.log("✅ New spreadsheet created:", ssid)
+    sessionStorage.setItem("tokboard_ssid", ssid)
+
+    const parts = [
+      ["Products", ["Product", "Cost of Product", "Note"]],
+      [
+        "Brand Deals",
+        [
+          "Brand/Company",
+          "Campaign/Deal Name",
+          "Source",
+          "Payment",
+          "Payment Type",
+          "Status",
+          "Due Date",
+          "Deliverables",
+          "Notes",
+        ],
+      ],
+      [
+        "Completed Deals",
+        [
+          "Brand/Company",
+          "Campaign/Deal Name",
+          "Source",
+          "Payment",
+          "Payment Type",
+          "Status",
+          "Due Date",
+          "Deliverables",
+          "Notes",
+        ],
+      ],
+      [
+        "Requests",
+        ["Company", "Product", "Collab Message", "Request", "Ad Code Sent", "Notes"],
+      ],
+      ["Posting Times", ["Day of the Week", "Best Time to Post"]],
+    ]
+
+    for (const [title, headers] of parts) {
+      try {
+        await window.gapi.client.sheets.spreadsheets.batchUpdate({
+          spreadsheetId: ssid,
+          resource: { requests: [{ addSheet: { properties: { title } } }] },
+        })
+        console.log(`✅ Sheet '${title}' created`)
+      } catch (e) {
+        console.log(`ℹ️ Sheet '${title}' may already exist`, e.message)
+      }
+      await window.gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId: ssid,
+        range: `'${title}'!A1`,
+        valueInputOption: "RAW",
+        resource: { values: [headers] },
+      })
+      console.log(`✅ Headers set for '${title}'`)
+    }
+
+    return ssid
+  })().finally(() => {
+    creatingPromise = null
+  })
+
+  return creatingPromise
 }
 
+// google.js
+
+const inflightReads = new Map();
+
 export async function readTab(ssid, tab) {
-  console.log(`📖 Reading tab '${tab}' from spreadsheet ${ssid}`)
-  const resp = await window.gapi.client.sheets.spreadsheets.values.get({
-    spreadsheetId: ssid,
-    range: `${tab}!A:Z`,
-  })
-  const rows = resp.result.values || []
-  if (!rows.length) {
-    console.log(`⚠️ Tab '${tab}' is empty`)
-    return []
+  const key = `${ssid}::${tab}`;
+
+  // if one is already running, return the same promise
+  if (inflightReads.has(key)) {
+    console.log(`⏸️ Joining in-flight read for '${tab}'`);
+    return inflightReads.get(key);
   }
-  const [headers, ...data] = rows
-  const mapped = data.map((r) =>
-    Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ""]))
-  )
-  console.log(`✅ Loaded ${mapped.length} rows from '${tab}'`)
-  return mapped
+
+  console.log(`📖 Reading tab '${tab}' from spreadsheet ${ssid}`);
+
+  const p = window.gapi.client.sheets.spreadsheets.values
+    .get({
+      spreadsheetId: ssid,
+      range: `${tab}!A:Z`,
+    })
+    .then((resp) => {
+      const rows = resp.result.values || [];
+      if (!rows.length) {
+        console.log(`⚠️ Tab '${tab}' is empty`);
+        return [];
+      }
+      const [headers, ...data] = rows;
+      const mapped = data.map((r) =>
+        Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ""]))
+      );
+      console.log(`✅ Loaded ${mapped.length} rows from '${tab}'`);
+      return mapped;
+    })
+    .catch((err) => {
+      console.error("❌ readTab error:", err);
+      throw err;
+    })
+    .finally(() => {
+      inflightReads.delete(key);
+    });
+
+  inflightReads.set(key, p);
+  return p;
 }
 
 export async function writeTab(ssid, tab, rows) {
