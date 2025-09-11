@@ -737,10 +737,12 @@ useEffect(() => {
           onChange={(e) => setStatusFilter(e.target.value)}
         >
           <option>All</option>
-          {STATUSES.map((s) => (
+          {(view === "active" ? STATUSES.filter(s => s !== "Posted") : ["Posted"]).map((s) => (
             <option key={s}>{s}</option>
           ))}
         </select>
+
+        {/* SORT dropdown (unchanged) */}
         <select
           className="select"
           value={sort}

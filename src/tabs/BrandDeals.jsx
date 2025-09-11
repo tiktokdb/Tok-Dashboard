@@ -517,9 +517,15 @@ useEffect(() => {
         </div>
 
         <input className="input" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select className="select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+        <select
+          className="select"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
           <option>All</option>
-          {DEAL_STATUSES.map((s) => <option key={s}>{s}</option>)}
+          {(view === "active" ? DEAL_STATUSES.filter(s => s !== "Paid") : ["Paid"]).map((s) => (
+            <option key={s}>{s}</option>
+          ))}
         </select>
         <select className="select" value={sort} onChange={(e) => setSort(e.target.value)}>
           <option value="updated-desc">Sort: Updated</option>
