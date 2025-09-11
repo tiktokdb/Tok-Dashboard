@@ -5,9 +5,7 @@ import BrandDeals from "./tabs/BrandDeals"
 const TABS = [
   { key: "products", label: "Products" },
   { key: "branddeals", label: "Brand Deals" },
-  { key: "requests", label: "Requests", coming: true },
-  { key: "times", label: "Posting Times", coming: true },
-]
+];
 
 export default function Dashboard({ email, ssid, onSignOut }) {
   const [tab, setTab] = useState("products")
@@ -35,11 +33,9 @@ export default function Dashboard({ email, ssid, onSignOut }) {
             <button
               key={t.key}
               className={`chip ${tab===t.key ? "active":""}`}
-              onClick={()=>!t.coming && setTab(t.key)}
-              title={t.coming ? "Coming soon" : ""}
-              disabled={t.coming}
+              onClick={() => setTab(t.key)}
             >
-              {t.label}{t.coming ? " (soon)" : ""}
+              {t.label}
             </button>
           ))}
         </div>

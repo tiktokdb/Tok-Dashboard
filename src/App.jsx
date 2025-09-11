@@ -6,6 +6,14 @@ import Dashboard from "./Dashboard";
 import { GOOGLE_CLIENT_ID, GOOGLE_API_KEY, GOOGLE_SCOPES } from "./config";
 import { isAllowedEmail } from "./allowlist";
 
+if (import.meta?.env?.MODE === "production") {
+  console.log = () => {};
+  console.debug = () => {};
+  console.info = () => {};
+  // console.warn still prints (unless you also silence it)
+  // console.error still prints
+}
+
 export default function App() {
   const [ready, setReady] = useState(false);
   const [email, setEmail] = useState(null);

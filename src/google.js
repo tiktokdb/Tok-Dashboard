@@ -14,6 +14,30 @@ function loadGapi() {
   })
 }
 
+async function deleteSheetsIfExist(ssid, titles) {
+  try {
+    const meta = await window.gapi.client.sheets.spreadsheets.get({
+      spreadsheetId: ssid,
+      includeGridData: false,
+    });
+    const toDelete = (meta.result.sheets || [])
+      .filter(s => titles.includes(s.properties.title))
+      .map(s => s.properties.sheetId);
+
+    if (toDelete.length) {
+      await window.gapi.client.sheets.spreadsheets.batchUpdate({
+        spreadsheetId: ssid,
+        resource: {
+          requests: toDelete.map(id => ({ deleteSheet: { sheetId: id } })),
+        },
+      });
+      console.log("🧹 Deleted legacy sheets:", titles.join(", "));
+    }
+  } catch (e) {
+    console.warn("Could not delete legacy sheets:", e?.message || e);
+  }
+}
+
 export async function initGoogle({ apiKey, clientId, scopes }) {
   if (gapiInitPromise) {
     console.log("⚡ Returning existing Google init")
@@ -160,6 +184,7 @@ export async function findOrCreateSpreadsheet() {
       const ssid = list.result.files[0].id
       console.log("✅ Found existing spreadsheet:", ssid)
       sessionStorage.setItem("tokboard_ssid", ssid)
+      await deleteSheetsIfExist(ssid, ["Requests", "Posting Times"]);
       return ssid
     }
 
@@ -207,12 +232,7 @@ export async function findOrCreateSpreadsheet() {
           "Notes",
         ],
       ],
-      [
-        "Requests",
-        ["Company", "Product", "Collab Message", "Request", "Ad Code Sent", "Notes"],
-      ],
-      ["Posting Times", ["Day of the Week", "Best Time to Post"]],
-    ]
+    ];
 
     for (const [title, headers] of parts) {
       try {
