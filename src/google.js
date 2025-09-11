@@ -184,7 +184,7 @@ export async function findOrCreateSpreadsheet() {
       const ssid = list.result.files[0].id
       console.log("✅ Found existing spreadsheet:", ssid)
       sessionStorage.setItem("tokboard_ssid", ssid)
-      await deleteSheetsIfExist(ssid, ["Requests", "Posting Times"]);
+      await deleteSheetsIfExist(ssid, ["Requests", "Posting Times", "Sheet1" ]);
       return ssid
     }
 
