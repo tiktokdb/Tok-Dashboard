@@ -11,6 +11,7 @@ export default function LandingPage({ onSignedIn, error }) {
   const [signingIn, setSigningIn] = useState(false);
   const [logoSrc, setLogoSrc] = useState(null);
   const [notAllowed, setNotAllowed] = useState(false);
+  const [showPlans, setShowPlans] = useState(false);
 
   // --- Lightbox state + data ---
   const [lightboxIndex, setLightboxIndex] = useState/** @type {number|null} */(null);
@@ -362,23 +363,58 @@ export default function LandingPage({ onSignedIn, error }) {
         <p className="fine" style={{ marginTop: "12px", color: "#fbbf24" }}>
           ⚠️ First time signing in? Google may show a warning that says 
           <i>“Google hasn’t verified this app.”</i><br />
-          Just click <b>Advanced → Go to tok-dashboard.onrender.com (unsafe)</b>
+          Just click <b>Advanced → Go to tokboard.com (unsafe)</b>
           to continue. You’ll only need to do this once while we’re waiting 
           on Google’s verification.
         </p>
 
+        <p className="fine" style={{ marginTop: 8 }}>
+          Not on the allowlist?{" "}
+          <button
+            type="button"
+            onClick={() => setShowPlans((s) => !s)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#93a0b5",
+              textDecoration: "underline",
+              cursor: "pointer",
+              padding: 0
+            }}
+          >
+            {showPlans ? "Hide plans" : "See plans"}
+          </button>
+        </p>
+
         {error && <p className="err">{error}</p>}
 
-        {notAllowed && (
+        {(notAllowed || showPlans) && (
           <div style={{ marginTop: 16 }}>
-            <p style={{ color: "#aab3c2" }}>
-              Don’t have access yet? Choose a plan to unlock TokBoard:
+            <p style={{ color: "#aab3c2", marginBottom: 8 }}>
+              {notAllowed
+                ? "Don’t have access yet? Choose a plan to unlock TokBoard:"
+                : "Plans"}
             </p>
-            <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr", maxWidth: 520, margin: "10px auto 0" }}>
-              <a className="cta" style={{ textAlign: "center" }} href={STRIPE_LINK_MONTHLY}>$5.99 / month</a>
-              <a className="cta" style={{ textAlign: "center" }} href={STRIPE_LINK_YEARLY}>$39.99 / year</a>
+            <div
+              style={{
+                display: "grid",
+                gap: 10,
+                gridTemplateColumns: "1fr 1fr",
+                maxWidth: 520,
+                margin: "10px auto 0"
+              }}
+            >
+              <a className="cta" style={{ textAlign: "center" }} href={STRIPE_LINK_MONTHLY}>
+                $5.99 / month
+              </a>
+              <a className="cta" style={{ textAlign: "center" }} href={STRIPE_LINK_YEARLY}>
+                $39.99 / year
+              </a>
             </div>
-            <p className="fine">After checkout, return here and sign in again—access unlocks automatically once your email is on the allowlist.</p>
+            <p className="fine">
+              After checkout, return here and sign in again—access unlocks automatically
+              once your email is on the allowlist.
+            </p>
           </div>
         )}
 
