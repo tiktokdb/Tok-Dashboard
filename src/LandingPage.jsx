@@ -359,32 +359,24 @@ export default function LandingPage({ onSignedIn, error }) {
           {signingIn ? "Redirecting…" : "Sign in with Google"}
         </button>
 
-        {/* NEW: info about the unverified app screen */}
-        <p className="fine" style={{ marginTop: "12px", color: "#fbbf24" }}>
-          ⚠️ First time signing in? Google may show a warning that says 
-          <i>“Google hasn’t verified this app.”</i><br />
-          Just click <b>Advanced → Go to tokboard.com (unsafe)</b>
-          to continue. You’ll only need to do this once while we’re waiting 
-          on Google’s verification.
-        </p>
+        {/* Unverified app notice (more visible) */}
+        <div className="notice">
+          ⚠️ First time signing in? Google may show a warning that says
+          <i> “Google hasn’t verified this app.”</i><br />
+          Just click <b>Advanced → Go to tokboard.net (unsafe)</b> to continue.
+          You’ll only need to do this once while we’re waiting on Google’s verification.
+        </div>
 
-        <p className="fine" style={{ marginTop: 8 }}>
-          Not on the allowlist?{" "}
+        {/* Plans toggle button (higher contrast than a link) */}
+        <div style={{ textAlign: "center" }}>
           <button
             type="button"
+            className="btn-ghost"
             onClick={() => setShowPlans((s) => !s)}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#93a0b5",
-              textDecoration: "underline",
-              cursor: "pointer",
-              padding: 0
-            }}
           >
-            {showPlans ? "Hide plans" : "See plans"}
+            {showPlans ? "Hide plans" : "See plans & pricing"}
           </button>
-        </p>
+        </div>
 
         {error && <p className="err">{error}</p>}
 

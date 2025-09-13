@@ -385,3 +385,29 @@ td textarea:focus {
 .tableWrap th:nth-child(8), .tableWrap td:nth-child(8) { min-width: 160px; }  /* Deliverables */
 .tableWrap th:nth-child(9), .tableWrap td:nth-child(9) { min-width: 200px; }  /* Notes */
 .tableWrap th:nth-child(10), .tableWrap td:nth-child(10) { width: 64px; }     /* Actions */
+
+
+.notice {
+  margin-top: 12px;
+  display: inline-block;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(251,191,36,.08);           /* amber tint */
+  border: 1px solid rgba(251,191,36,.35);
+  color: #fbbf24;
+  font-size: 13px;
+}
+
+.btn-ghost {
+  margin-top: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.14);
+  color: #e8ebf1;
+  font-weight: 800;
+  cursor: pointer;
+  transition: filter .12s ease, transform .12s ease;
+}
+.btn-ghost:hover { filter: brightness(1.06); transform: translateY(-1px); }
