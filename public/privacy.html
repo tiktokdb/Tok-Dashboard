@@ -21,6 +21,20 @@
 
     <p><b>TokBoard</b> is a creator workflow tool that connects to your Google account (with your consent) to read/write rows in Google Sheets that you control. We don’t run a database for your product data—your rows live in your Google account.</p>
 
+    <!-- INSERTED: scopes/why block for Google reviewers -->
+    <h2 id="google-scopes">Google permissions (at a glance)</h2>
+    <p>TokBoard connects to your Google account only to read/write the spreadsheet you choose. We don’t copy your sheet contents to our servers.</p>
+    <ul>
+      <li><code>https://www.googleapis.com/auth/spreadsheets</code> — create/read/update rows in your tracking sheet.</li>
+      <li><code>https://www.googleapis.com/auth/drive.file</code> — open or create <em>only</em> the specific spreadsheet you pick; TokBoard cannot see other Drive files.</li>
+      <li><code>openid</code>, <code>email</code>, <code>profile</code> — sign in with Google and show your email.</li>
+    </ul>
+    <p>Use of information received from Google APIs adheres to the
+      <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>, including <em>Limited Use</em>. You can revoke access anytime at
+      <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google Account → Security → Third-party access</a>.
+    </p>
+    <!-- /INSERTED -->
+
     <h2>What we collect</h2>
     <ul>
       <li><b>Google account email</b> (read-only), used to identify your session.</li>

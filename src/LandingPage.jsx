@@ -190,6 +190,14 @@ export default function LandingPage({ onSignedIn, error }) {
         .fine { margin: 14px 0 0; color: #9aa4b2; font-size: 13px; }
         .links { margin-top: 10px; font-size: 13px; color: #93a0b5; }
         .links a { color: inherit; }
+        .dataLink { 
+        margin: 10px 0 18px; 
+        text-align: center; 
+        font-size: 14px; 
+        color: #93a0b5; 
+      }
+.dataLink a { color: inherit; text-decoration: underline; }
+
         .err { color: #fca5a5; margin-top: 12px; }
 
         @media (max-width: 520px) {
@@ -332,6 +340,11 @@ export default function LandingPage({ onSignedIn, error }) {
             <li><span className="dot" /> <b>Your data stays in your Google account</b> (we don’t store your spreadsheet).</li>
           </ul>
         </section>
+
+        {/* Minimal link for Google reviewers */}
+        <p className="dataLink">
+          <a href="/privacy.html#google-scopes">How TokBoard uses your Google data</a>
+        </p>
 
         <section className="peek">
         <h2 className="peek-title">Sneak peek</h2>
