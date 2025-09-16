@@ -5,7 +5,6 @@ import LandingPage from "./LandingPage";
 import Dashboard from "./Dashboard";
 import { GOOGLE_CLIENT_ID, GOOGLE_API_KEY, GOOGLE_SCOPES } from "./config";
 import { isAllowedEmail } from "./allowlist";
-import { startUsage, stopUsage } from "./usage";
 
 export default function App() {
   const [ready, setReady] = useState(false);
