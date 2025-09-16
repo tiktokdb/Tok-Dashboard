@@ -4,6 +4,7 @@ let gapiInitPromise = null
 let tokenClient = null
 let tokenResolver = null
 
+
 function loadGapi() {
   return new Promise((resolve) => {
     const check = () => {

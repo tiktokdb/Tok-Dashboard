@@ -5,6 +5,7 @@ import LandingPage from "./LandingPage";
 import Dashboard from "./Dashboard";
 import { GOOGLE_CLIENT_ID, GOOGLE_API_KEY, GOOGLE_SCOPES } from "./config";
 import { isAllowedEmail } from "./allowlist";
+import { startUsage, stopUsage } from "./usage";
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -37,6 +38,7 @@ export default function App() {
 
   // --- helper: clear token + bounce to checkout ---
   function signOut() {
+    try { stopUsage(); } catch {} 
     try { window.gapi?.client?.setToken(null); } catch {}
     sessionStorage.removeItem("tokboard_token");
     sessionStorage.removeItem("tokboard_ssid");
@@ -55,6 +57,7 @@ export default function App() {
     }
     setEmail(em);
     setLicensed(true);
+    startUsage(em);
 
     // ✅ always find/create sheet at login
     const id = await findOrCreateSpreadsheet();
@@ -62,6 +65,7 @@ export default function App() {
   }
 
   function handleSignOut() {
+    try { stopUsage(); } catch {}
     try { window.gapi?.client?.setToken(null); } catch {}
     sessionStorage.removeItem("tokboard_token");
     sessionStorage.removeItem("tokboard_ssid");
@@ -108,6 +112,7 @@ export default function App() {
            }
           setEmail(em);
           setLicensed(true);
+          startUsage(em);
 
            // ✅ also create/find spreadsheet on restore
           const id = await findOrCreateSpreadsheet();
