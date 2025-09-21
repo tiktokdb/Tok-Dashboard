@@ -1,9 +1,8 @@
-// google.js
+// src/google.js
 
 let gapiInitPromise = null
 let tokenClient = null
 let tokenResolver = null
-
 
 function loadGapi() {
   return new Promise((resolve) => {
@@ -15,39 +14,88 @@ function loadGapi() {
   })
 }
 
+// --- small helpers ---
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+async function with403Retry(fn, { retries = 1, delayMs = 1200 } = {}) {
+  try {
+    return await fn()
+  } catch (err) {
+    const status = err?.status || err?.result?.error?.code
+    const is403 = status === 403
+    // If currentonly isn’t “current” yet, the first write can 403. Retry once.
+    if (is403 && retries > 0) {
+      await sleep(delayMs)
+      return with403Retry(fn, { retries: retries - 1, delayMs })
+    }
+    throw err
+  }
+}
+
 async function deleteSheetsIfExist(ssid, titles) {
   try {
     const meta = await window.gapi.client.sheets.spreadsheets.get({
       spreadsheetId: ssid,
       includeGridData: false,
-    });
+    })
     const toDelete = (meta.result.sheets || [])
       .filter(s => titles.includes(s.properties.title))
-      .map(s => s.properties.sheetId);
+      .map(s => s.properties.sheetId)
 
     if (toDelete.length) {
-      await window.gapi.client.sheets.spreadsheets.batchUpdate({
-        spreadsheetId: ssid,
-        resource: {
-          requests: toDelete.map(id => ({ deleteSheet: { sheetId: id } })),
-        },
-      });
+      await with403Retry(() =>
+        window.gapi.client.sheets.spreadsheets.batchUpdate({
+          spreadsheetId: ssid,
+          resource: {
+            requests: toDelete.map(id => ({ deleteSheet: { sheetId: id } })),
+          },
+        })
+      )
     }
   } catch (e) {
-    console.warn("Could not delete legacy sheets:", e?.message || e);
+    console.warn("Could not delete legacy sheets:", e?.message || e)
+  }
+}
+
+// Delete any auto-created default tabs named "Sheet", "Sheet1", "Sheet 1", "Sheet2", etc.
+async function deleteDefaultSheets(ssid) {
+  try {
+    const meta = await window.gapi.client.sheets.spreadsheets.get({
+      spreadsheetId: ssid,
+      includeGridData: false,
+    })
+
+    // Titles like Google's defaults: "Sheet", "Sheet1", "Sheet 1", "Sheet2", ...
+    const isDefaultTitle = (t) => /^Sheet(\s?\d+)?$/i.test((t || "").trim())
+
+    // Never delete our real tabs
+    const keep = new Set(["Products", "Brand Deals", "Completed Deals"])
+
+    const toDelete = (meta.result.sheets || [])
+      .filter(s => isDefaultTitle(s.properties.title) && !keep.has(s.properties.title))
+      .map(s => s.properties.sheetId)
+
+    if (!toDelete.length) return
+
+    await with403Retry(() =>
+      window.gapi.client.sheets.spreadsheets.batchUpdate({
+        spreadsheetId: ssid,
+        resource: { requests: toDelete.map(id => ({ deleteSheet: { sheetId: id } })) },
+      })
+    )
+  } catch (e) {
+    console.warn("Could not delete default Sheets:", e?.message || e)
   }
 }
 
 export async function initGoogle({ apiKey, clientId, scopes }) {
-  if (gapiInitPromise) {
-    return gapiInitPromise
-  }
+  if (gapiInitPromise) return gapiInitPromise
 
   gapiInitPromise = (async () => {
     await loadGapi()
-
     await new Promise((res) => window.gapi.load("client", res))
 
+    // Load Sheets v4 + Drive v3 discovery docs
     await window.gapi.client.init({
       apiKey,
       discoveryDocs: [
@@ -59,19 +107,12 @@ export async function initGoogle({ apiKey, clientId, scopes }) {
     tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: scopes,
-      ux_mode: "redirect", // 👈 switched from popup → redirect
-      redirect_uri: window.location.origin, // must match Google Console
+      ux_mode: "redirect",
+      redirect_uri: window.location.origin,
       callback: (resp) => {
-
-        if (!tokenResolver) {
-          return
-        }
-
-        if (resp && resp.error) {
-          tokenResolver.reject(resp)
-        } else {
-          tokenResolver.resolve(resp)
-        }
+        if (!tokenResolver) return
+        if (resp && resp.error) tokenResolver.reject(resp)
+        else tokenResolver.resolve(resp)
         tokenResolver = null
       },
     })
@@ -85,17 +126,14 @@ export async function ensureToken(prompt = "") {
   if (!tokenClient) throw new Error("tokenClient not initialized yet")
 
   return new Promise((resolve, reject) => {
-    // wrap the resolver so we can set gapi token if it arrived immediately
     tokenResolver = {
       resolve: (resp) => {
         try {
           if (resp?.access_token) {
-          // ✅ Tell gapi about the token so Sheets/Drive + userinfo work now
-          window.gapi?.client?.setToken({ access_token: resp.access_token })
-        }
-          // Persist token for refresh (session-only)
+            window.gapi?.client?.setToken({ access_token: resp.access_token })
+          }
           try {
-            const expiresAt = Date.now() + ((resp?.expires_in || 3600) - 60) * 1000 // minus 60s buffer
+            const expiresAt = Date.now() + ((resp?.expires_in || 3600) - 60) * 1000
             sessionStorage.setItem(
               "tokboard_token",
               JSON.stringify({ access_token: resp.access_token, expires_at: expiresAt })
@@ -110,6 +148,7 @@ export async function ensureToken(prompt = "") {
       },
       reject,
     }
+
     try {
       tokenClient.requestAccessToken({ prompt })
     } catch (err) {
@@ -126,15 +165,11 @@ export function getAccessToken() {
 
 export async function fetchUserEmail() {
   const token = getAccessToken()
-  if (!token) {
-    return null
-  }
+  if (!token) return null
   const resp = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
     headers: { Authorization: `Bearer ${token}` },
   })
-  if (!resp.ok) {
-    return null
-  }
+  if (!resp.ok) return null
   const data = await resp.json()
   return (data.email || "").toLowerCase()
 }
@@ -142,13 +177,10 @@ export async function fetchUserEmail() {
 let creatingPromise = null
 
 export async function findOrCreateSpreadsheet() {
-  // if one call is already creating, wait for it
   if (creatingPromise) return creatingPromise
 
   const cached = sessionStorage.getItem("tokboard_ssid")
-  if (cached) {
-    return cached
-  }
+  if (cached) return cached
 
   creatingPromise = (async () => {
     const q =
@@ -161,10 +193,13 @@ export async function findOrCreateSpreadsheet() {
     if (list.result.files && list.result.files.length) {
       const ssid = list.result.files[0].id
       sessionStorage.setItem("tokboard_ssid", ssid)
-      await deleteSheetsIfExist(ssid, ["Requests", "Posting Times", "Sheet1" ]);
+      // Clean up any legacy or default tabs on existing sheets
+      await deleteSheetsIfExist(ssid, ["Requests", "Posting Times", "Sheet1"])
+      await deleteDefaultSheets(ssid)
       return ssid
     }
 
+    // Create brand-new spreadsheet (first run)
     const created = await window.gapi.client.drive.files.create({
       resource: {
         name: "TokBoard",
@@ -177,53 +212,8 @@ export async function findOrCreateSpreadsheet() {
     const ssid = created.result.id
     sessionStorage.setItem("tokboard_ssid", ssid)
 
-    const parts = [
-      ["Products", ["Product", "Cost of Product", "Note"]],
-      [
-        "Brand Deals",
-        [
-          "Brand/Company",
-          "Campaign/Deal Name",
-          "Source",
-          "Payment",
-          "Payment Type",
-          "Status",
-          "Due Date",
-          "Deliverables",
-          "Notes",
-        ],
-      ],
-      [
-        "Completed Deals",
-        [
-          "Brand/Company",
-          "Campaign/Deal Name",
-          "Source",
-          "Payment",
-          "Payment Type",
-          "Status",
-          "Due Date",
-          "Deliverables",
-          "Notes",
-        ],
-      ],
-    ];
-
-    for (const [title, headers] of parts) {
-      try {
-        await window.gapi.client.sheets.spreadsheets.batchUpdate({
-          spreadsheetId: ssid,
-          resource: { requests: [{ addSheet: { properties: { title } } }] },
-        })
-      } catch (e) {
-      }
-      await window.gapi.client.sheets.spreadsheets.values.update({
-        spreadsheetId: ssid,
-        range: `'${title}'!A1`,
-        valueInputOption: "RAW",
-        resource: { values: [headers] },
-      })
-    }
+    // Mark that we still need to set up sheets/headers — do it after iframe loads.
+    sessionStorage.setItem("tokboard_needs_init", "1")
 
     return ssid
   })().finally(() => {
@@ -233,17 +223,73 @@ export async function findOrCreateSpreadsheet() {
   return creatingPromise
 }
 
-// google.js
+// Called AFTER the Sheet is “current” (e.g., iframe onLoad)
+export async function initSheetStructure(ssid) {
+  const parts = [
+    ["Products", ["Product", "Cost of Product", "Note"]],
+    [
+      "Brand Deals",
+      [
+        "Brand/Company",
+        "Campaign/Deal Name",
+        "Source",
+        "Payment",
+        "Payment Type",
+        "Status",
+        "Due Date",
+        "Deliverables",
+        "Notes",
+      ],
+    ],
+    [
+      "Completed Deals",
+      [
+        "Brand/Company",
+        "Campaign/Deal Name",
+        "Source",
+        "Payment",
+        "Payment Type",
+        "Status",
+        "Due Date",
+        "Deliverables",
+        "Notes",
+      ],
+    ],
+  ]
 
-const inflightReads = new Map();
+  for (const [title, headers] of parts) {
+    try {
+      await with403Retry(() =>
+        window.gapi.client.sheets.spreadsheets.batchUpdate({
+          spreadsheetId: ssid,
+          resource: { requests: [{ addSheet: { properties: { title } } }] },
+        })
+      )
+    } catch (e) {
+      // Already exists — ignore
+    }
+
+    await with403Retry(() =>
+      window.gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId: ssid,
+        range: `'${title}'!A1`,
+        valueInputOption: "RAW",
+        resource: { values: [headers] },
+      })
+    )
+  }
+
+  // After creating our tabs, remove any default "Sheet"/"Sheet1"/"Sheet 1"/"Sheet2" tabs
+  await sleep(200)
+  await deleteDefaultSheets(ssid)
+}
+
+// (Kept for local tabs use; also wrapped writes in retry)
+const inflightReads = new Map()
 
 export async function readTab(ssid, tab) {
-  const key = `${ssid}::${tab}`;
-
-  // if one is already running, return the same promise
-  if (inflightReads.has(key)) {
-    return inflightReads.get(key);
-  }
+  const key = `${ssid}::${tab}`
+  if (inflightReads.has(key)) return inflightReads.get(key)
 
   const p = window.gapi.client.sheets.spreadsheets.values
     .get({
@@ -251,40 +297,44 @@ export async function readTab(ssid, tab) {
       range: `${tab}!A:Z`,
     })
     .then((resp) => {
-      const rows = resp.result.values || [];
-      if (!rows.length) {
-        return [];
-      }
-      const [headers, ...data] = rows;
+      const rows = resp.result.values || []
+      if (!rows.length) return []
+      const [headers, ...data] = rows
       const mapped = data.map((r) =>
         Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ""]))
-      );
-      return mapped;
+      )
+      return mapped
     })
     .catch((err) => {
-      console.error("❌ readTab error:", err);
-      throw err;
+      console.error("❌ readTab error:", err)
+      throw err
     })
     .finally(() => {
-      inflightReads.delete(key);
-    });
+      inflightReads.delete(key)
+    })
 
-  inflightReads.set(key, p);
-  return p;
+  inflightReads.set(key, p)
+  return p
 }
 
 export async function writeTab(ssid, tab, rows) {
   if (!rows.length) return
   const headers = Object.keys(rows[0] || {})
   const values = [headers, ...rows.map((r) => headers.map((h) => `${r[h] ?? ""}`))]
-  await window.gapi.client.sheets.spreadsheets.values.clear({
-    spreadsheetId: ssid,
-    range: `${tab}!A:Z`,
-  })
-  await window.gapi.client.sheets.spreadsheets.values.update({
-    spreadsheetId: ssid,
-    range: `${tab}!A1`,
-    valueInputOption: "RAW",
-    resource: { values },
-  })
+
+  await with403Retry(() =>
+    window.gapi.client.sheets.spreadsheets.values.clear({
+      spreadsheetId: ssid,
+      range: `${tab}!A:Z`,
+    })
+  )
+
+  await with403Retry(() =>
+    window.gapi.client.sheets.spreadsheets.values.update({
+      spreadsheetId: ssid,
+      range: `${tab}!A1`,
+      valueInputOption: "RAW",
+      resource: { values },
+    })
+  )
 }

@@ -1,4 +1,3 @@
-// src/App.jsx
 import React, { useEffect, useState } from "react";
 import { initGoogle, fetchUserEmail, findOrCreateSpreadsheet } from "./google";
 import LandingPage from "./LandingPage";
@@ -36,9 +35,8 @@ export default function App() {
     })();
   }, []);
 
-  // --- helper: clear token + bounce to checkout ---
   function signOut() {
-    try { stopUsage(); } catch {} 
+    try { stopUsage(); } catch {}
     try { window.gapi?.client?.setToken(null); } catch {}
     sessionStorage.removeItem("tokboard_token");
     sessionStorage.removeItem("tokboard_ssid");
@@ -47,7 +45,7 @@ export default function App() {
     setSsid(null);
   }
 
-  // --- called by LandingPage after Google sign-in completes ---
+  // called by LandingPage after Google sign-in completes
   async function handleSignedIn(em) {
     const ok = await isAllowedEmail(em);
     if (!ok) {
@@ -59,7 +57,7 @@ export default function App() {
     setLicensed(true);
     startUsage(em);
 
-    // ✅ always find/create sheet at login
+    // find/create sheet — NO redirect; Dashboard will embed it
     const id = await findOrCreateSpreadsheet();
     setSsid(id);
   }
@@ -74,25 +72,21 @@ export default function App() {
     setSsid(null);
   }
 
-  // --- boot-time auth check: restore token, resolve user, THEN allowlist-check ---
+  // boot-time auth check
   useEffect(() => {
     if (!ready || email) return;
     (async () => {
       try {
-        // 1) If we just came back from Google, use the hash token
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get("access_token");
         if (accessToken) {
           window.gapi?.client?.setToken({ access_token: accessToken });
-          // Clean URL
           window.history.replaceState({}, document.title, window.location.pathname);
-          // optional: persist for this browser session
-          sessionStorage.setItem("tokboard_token", JSON.stringify({
-            access_token: accessToken, // no expiry guaranteed here, but fine for session restore
-            saved_at: Date.now(),
-          }));
+          sessionStorage.setItem(
+            "tokboard_token",
+            JSON.stringify({ access_token: accessToken, saved_at: Date.now() })
+          );
         } else {
-          // 2) Otherwise restore a token we saved earlier (sessionStorage)
           const saved = JSON.parse(sessionStorage.getItem("tokboard_token") || "null");
           if (saved?.access_token) {
             window.gapi?.client?.setToken({ access_token: saved.access_token });
@@ -101,27 +95,24 @@ export default function App() {
           }
         }
 
-        // Resolve current user
         const em = await fetchUserEmail();
         if (em) {
-          // ALLOWLIST right here at boot
           const ok = await isAllowedEmail(em);
           if (!ok) {
-             signOut(); // LandingPage will render and show pricing
-             return;
-           }
+            signOut();
+            return;
+          }
           setEmail(em);
           setLicensed(true);
           startUsage(em);
 
-           // ✅ also create/find spreadsheet on restore
           const id = await findOrCreateSpreadsheet();
-          setSsid(id);
+          setSsid(id); // Dashboard will embed
         }
       } catch (e) {
         console.log("auth boot check:", e);
       } finally {
-        setAuthChecked(true); // ✅ safe to render LandingPage if still signed out
+        setAuthChecked(true);
       }
     })();
   }, [ready, email]);

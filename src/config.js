@@ -7,6 +7,6 @@ export const GOOGLE_SCOPES = [
   "openid",                           // standard OpenID Connect
   "email",                            // user’s email address
   "profile",                          // basic profile (name, picture)
-  "https://www.googleapis.com/auth/spreadsheets", // read/write sheets
+  "https://www.googleapis.com/auth/spreadsheets.currentonly",
   "https://www.googleapis.com/auth/drive.file",   // create/edit app files
 ].join(" ");
