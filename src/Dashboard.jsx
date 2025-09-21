@@ -21,20 +21,17 @@ export default function Dashboard({ email, ssid, onSignOut }) {
     }
   }, [tab]);
 
-  async function handleIframeLoad() {
+  async function handleHiddenIframeLoad() {
     if (!ssid) return;
-    // Run once per mount to avoid loops
-    if (didInitRef.current) return;
+    if (didInitRef.current) return; // run once per mount
     didInitRef.current = true;
-
     try {
-      // Now the spreadsheet is “current” for this user session.
-      // Create our tabs (if missing), write headers, then delete all non-TokBoard tabs (e.g., “Sheet1”).
-      await initSheetStructure(ssid);
+      await initSheetStructure(ssid); // create our tabs + headers, delete default “Sheet1”
     } catch (e) {
       console.warn("initSheetStructure failed:", e?.message || e);
-      // If you want a retry on slow loads, uncomment:
-      // setTimeout(() => { didInitRef.current = false; handleIframeLoad(); }, 800);
+      // Optional tiny retry:
+      // didInitRef.current = false;
+      // setTimeout(handleHiddenIframeLoad, 800);
     }
   }
 
@@ -47,71 +44,50 @@ export default function Dashboard({ email, ssid, onSignOut }) {
           <span className="muted" style={{ marginLeft: 8 }}>for Creators</span>
         </div>
 
-        {/* Tabs hidden while sheet is embedded to maximize space */}
-        {!ssid && (
-          <div className="chips">
-            {TABS.map((t) => (
-              <button
-                key={t.key}
-                className={`chip ${tab === t.key ? "active" : ""}`}
-                onClick={() => setTab(t.key)}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Always show your two tabs (no sheet tab) */}
+        <div className="chips">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              className={`chip ${tab === t.key ? "active" : ""}`}
+              onClick={() => setTab(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {ssid && (
-            <a
-              className="btn"
-              href={`https://docs.google.com/spreadsheets/d/${ssid}/edit`}
-              target="_blank"
-              rel="noreferrer"
-              title="Open your Google Sheet in a new tab"
-            >
-              Open in Google Sheets
-            </a>
-          )}
           <span className="muted">Signed in as <b>{email}</b></span>
           <button className="btn" onClick={onSignOut}>Sign out</button>
         </div>
       </div>
 
-      {/* Page content */}
-      <div className="page" style={{ padding: 0 }}>
-        {ssid ? (
-          // ✅ Embed the Sheet IN the dashboard
-          <iframe
-            key={ssid}
-            src={`https://docs.google.com/spreadsheets/d/${ssid}/edit?rm=embedded`}
-            style={{
-              width: "100%",
-              height: "calc(100vh - 64px)",
-              border: 0,
-            }}
-            allow="clipboard-read; clipboard-write"
-            title="TokBoard Sheet"
-            onLoad={handleIframeLoad}
-          />
-        ) : (
-          // Fallback to local tabs if no sheet yet
-          <div style={{ padding: 24 }}>
-            <div className="chips" style={{ marginBottom: 16 }}>
-              {TABS.map((t) => (
-                <button
-                  key={t.key}
-                  className={`chip ${tab === t.key ? "active" : ""}`}
-                  onClick={() => setTab(t.key)}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-            <TabComp />
-          </div>
-        )}
+      {/* Hidden iframe — makes the spreadsheet “current” for spreadsheets.currentonly */}
+      {ssid && (
+        <iframe
+          key={`hidden-${ssid}`}
+          src={`https://docs.google.com/spreadsheets/d/${ssid}/edit?rm=embedded`}
+          title="TokBoard Hidden Sheet Loader"
+          onLoad={handleHiddenIframeLoad}
+          // hidden but still loads reliably
+          style={{
+            position: "absolute",
+            width: 1,
+            height: 1,
+            opacity: 0,
+            pointerEvents: "none",
+            border: 0,
+            left: -9999,
+            top: -9999,
+          }}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Visible page content = your in-app tabs only */}
+      <div className="page" style={{ padding: 24 }}>
+        <TabComp email={email} ssid={ssid} />
       </div>
     </>
   );
