@@ -15,22 +15,66 @@ function loadGapi() {
 }
 
 // --- small helpers ---
+// --- small helpers ---
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-async function with403Retry(fn, { retries = 1, delayMs = 1200 } = {}) {
+// The two scopes TokBoard must have
+export const REQUIRED_SCOPES = [
+  "https://www.googleapis.com/auth/drive.file",
+  "https://www.googleapis.com/auth/spreadsheets.currentonly",
+]
+
+// Detect permission errors from Google APIs
+function isInsufficientPermissions(err) {
+  const code = err?.status || err?.result?.error?.code
+  const msg  = (err?.result?.error?.message || "").toLowerCase()
+  return code === 403 || msg.includes("insufficientpermissions")
+}
+
+// Kick user back to Google’s consent screen with both boxes required
+export function reconsentForRequiredScopes() {
+  if (!tokenClient) return
+  tokenClient.requestAccessToken({
+    scope: REQUIRED_SCOPES.join(" "),
+    prompt: "consent",                 // force the checkboxes dialog
+    include_granted_scopes: true,      // keep already-granted scopes checked
+  })
+}
+
+// Show the alert just once per page load
+let showedScopeAlert = false
+
+// Wrap any Drive/Sheets call; if the user unchecked a box, we alert + bounce to consent
+async function with403Retry(
+  fn,
+  { retries = 1, delayMs = 1200, reconsentOn403 = true } = {}
+) {
   try {
     return await fn()
   } catch (err) {
-    const status = err?.status || err?.result?.error?.code
-    const is403 = status === 403
-    // If currentonly isn’t “current” yet, the first write can 403. Retry once.
-    if (is403 && retries > 0) {
-      await sleep(delayMs)
-      return with403Retry(fn, { retries: retries - 1, delayMs })
+    if (isInsufficientPermissions(err)) {
+      if (!showedScopeAlert) {
+        showedScopeAlert = true
+        // 👇 This is the user-facing message you asked for
+        alert(
+          "TokBoard needs BOTH permissions:\n\n" +
+          "• Google Drive (files used with this app)\n" +
+          "• Google Sheets (current sheet)\n\n" +
+          "Please check both boxes on the next screen."
+        )
+      }
+      if (reconsentOn403) {
+        try { reconsentForRequiredScopes() } catch {}
+      }
+      if (retries > 0) {
+        await sleep(delayMs)
+        return with403Retry(fn, { retries: retries - 1, delayMs, reconsentOn403 })
+      }
     }
     throw err
   }
 }
+
 
 async function deleteSheetsIfExist(ssid, titles) {
   try {
