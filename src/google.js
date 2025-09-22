@@ -390,7 +390,7 @@ export async function readTab(ssid, tab) {
 
       const data = rows.slice(1)
       return data.map((r) =>
-        Object.fromEntries(headers.map((h, i) => [h, (r[i] ?? "").toString()]))
+        Object.fromEntries(headers.map((h, i) => [h, (r[i] ?? "").toString().trim()]))
       )
     })
     .catch((err) => {
