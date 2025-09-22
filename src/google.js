@@ -17,20 +17,61 @@ function loadGapi() {
 // --- small helpers ---
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+function clearAuthAndRestart() {
+  try { window.gapi?.client?.setToken(null) } catch {}
+  try { sessionStorage.removeItem("tokboard_token") } catch {}
+  try { sessionStorage.removeItem("tokboard_ssid") } catch {}
+  window.location.assign(`${window.location.origin}/`)
+}
+
+/* ===== 1) REQUIRE BOTH SCOPES ===== */
+export const REQUIRED_SCOPES = [
+  "https://www.googleapis.com/auth/drive.file",
+  "https://www.googleapis.com/auth/spreadsheets.currentonly",
+  "openid",
+  "email",
+]
+
+// one-time alert
+let showedScopeAlert = false
+function scopeAlertOnce() {
+  if (showedScopeAlert) return
+  showedScopeAlert = true
+  alert(
+    "TokBoard needs BOTH permissions:\n\n" +
+    "• Google Drive (files used with this app)\n" +
+    "• Google Sheets (current sheet)\n\n" +
+    "Please check both boxes. You'll be sent back to the sign-in screen to try again."
+  )
+}
+
+// If Google throws permission errors while calling APIs, bounce user to restart
+function isInsufficientPermissions(err) {
+  const code = err?.status || err?.result?.error?.code
+  const msg  = (err?.result?.error?.message || "").toLowerCase()
+  return code === 403 || msg.includes("insufficientpermissions")
+}
+
 async function with403Retry(fn, { retries = 1, delayMs = 1200 } = {}) {
   try {
     return await fn()
   } catch (err) {
+    if (isInsufficientPermissions(err)) {
+      scopeAlertOnce()
+      clearAuthAndRestart()
+      return // navigation
+    }
+    // If it's not a scopes issue, keep the small retry behavior you had
     const status = err?.status || err?.result?.error?.code
-    const is403 = status === 403
-    // If currentonly isn’t “current” yet, the first write can 403. Retry once.
-    if (is403 && retries > 0) {
+    if (status === 403 && retries > 0) {
       await sleep(delayMs)
       return with403Retry(fn, { retries: retries - 1, delayMs })
     }
     throw err
   }
 }
+
+/* ===== sheets utils you already had ===== */
 
 async function deleteSheetsIfExist(ssid, titles) {
   try {
@@ -57,7 +98,6 @@ async function deleteSheetsIfExist(ssid, titles) {
   }
 }
 
-// Delete any auto-created default tabs named "Sheet", "Sheet1", "Sheet 1", "Sheet2", etc.
 async function deleteDefaultSheets(ssid) {
   try {
     const meta = await window.gapi.client.sheets.spreadsheets.get({
@@ -65,10 +105,7 @@ async function deleteDefaultSheets(ssid) {
       includeGridData: false,
     })
 
-    // Titles like Google's defaults: "Sheet", "Sheet1", "Sheet 1", "Sheet2", ...
     const isDefaultTitle = (t) => /^Sheet(\s?\d+)?$/i.test((t || "").trim())
-
-    // Never delete our real tabs
     const keep = new Set(["Products", "Brand Deals", "Completed Deals"])
 
     const toDelete = (meta.result.sheets || [])
@@ -88,6 +125,8 @@ async function deleteDefaultSheets(ssid) {
   }
 }
 
+/* ===== init & token ===== */
+
 export async function initGoogle({ apiKey, clientId, scopes }) {
   if (gapiInitPromise) return gapiInitPromise
 
@@ -95,7 +134,6 @@ export async function initGoogle({ apiKey, clientId, scopes }) {
     await loadGapi()
     await new Promise((res) => window.gapi.load("client", res))
 
-    // Load Sheets v4 + Drive v3 discovery docs
     await window.gapi.client.init({
       apiKey,
       discoveryDocs: [
@@ -106,9 +144,8 @@ export async function initGoogle({ apiKey, clientId, scopes }) {
 
     tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      scope: scopes,
-      ux_mode: "redirect",
-      redirect_uri: window.location.origin,
+      scope: scopes || REQUIRED_SCOPES.join(" "),
+      // keep popup (default). redirect complicates flows.
       callback: (resp) => {
         if (!tokenResolver) return
         if (resp && resp.error) tokenResolver.reject(resp)
@@ -121,29 +158,51 @@ export async function initGoogle({ apiKey, clientId, scopes }) {
   return gapiInitPromise
 }
 
-export async function ensureToken(prompt = "") {
+export async function ensureToken(prompt = "consent") {
   if (!gapiInitPromise) throw new Error("gapi not initialized yet")
   if (!tokenClient) throw new Error("tokenClient not initialized yet")
 
   return new Promise((resolve, reject) => {
     tokenResolver = {
       resolve: (resp) => {
+        // Handle popup/denied
+        if (resp?.error) {
+          const err = String(resp.error).toLowerCase()
+          if (err.includes("popup") || err.includes("access_denied")) {
+            alert(
+              "Please allow pop-ups for TokBoard, then click Sign in again.\n\n" +
+              "(If you just enabled pop-ups, click Sign in once more.)"
+            )
+          }
+          return reject(resp)
+        }
+
+        // Save token
         try {
           if (resp?.access_token) {
             window.gapi?.client?.setToken({ access_token: resp.access_token })
-          }
-          try {
             const expiresAt = Date.now() + ((resp?.expires_in || 3600) - 60) * 1000
             sessionStorage.setItem(
               "tokboard_token",
               JSON.stringify({ access_token: resp.access_token, expires_at: expiresAt })
             )
-          } catch (e) {
-            console.warn("⚠️ Could not persist token:", e)
           }
         } catch (e) {
-          console.warn("⚠️ Could not set gapi token from resp:", e)
+          console.warn("⚠️ Could not persist token:", e)
         }
+
+        // ✅ REQUIRE BOTH BOXES
+        let ok = false
+        try {
+          ok = window.google.accounts.oauth2.hasGrantedAllScopes(resp, ...REQUIRED_SCOPES)
+        } catch {}
+
+        if (!ok) {
+          scopeAlertOnce()
+          clearAuthAndRestart()  // wipe partial token & send back to landing
+          return                 // navigation, don’t resolve
+        }
+
         resolve(resp)
       },
       reject,
@@ -174,6 +233,8 @@ export async function fetchUserEmail() {
   return (data.email || "").toLowerCase()
 }
 
+/* ===== drive/sheets entry points ===== */
+
 let creatingPromise = null
 
 export async function findOrCreateSpreadsheet() {
@@ -193,13 +254,11 @@ export async function findOrCreateSpreadsheet() {
     if (list.result.files && list.result.files.length) {
       const ssid = list.result.files[0].id
       sessionStorage.setItem("tokboard_ssid", ssid)
-      // Clean up any legacy or default tabs on existing sheets
       await deleteSheetsIfExist(ssid, ["Requests", "Posting Times", "Sheet1"])
       await deleteDefaultSheets(ssid)
       return ssid
     }
 
-    // Create brand-new spreadsheet (first run)
     const created = await window.gapi.client.drive.files.create({
       resource: {
         name: "TokBoard",
@@ -211,10 +270,7 @@ export async function findOrCreateSpreadsheet() {
 
     const ssid = created.result.id
     sessionStorage.setItem("tokboard_ssid", ssid)
-
-    // Mark that we still need to set up sheets/headers — do it after iframe loads.
     sessionStorage.setItem("tokboard_needs_init", "1")
-
     return ssid
   })().finally(() => {
     creatingPromise = null
@@ -279,12 +335,37 @@ export async function initSheetStructure(ssid) {
     )
   }
 
-  // After creating our tabs, remove any default "Sheet"/"Sheet1"/"Sheet 1"/"Sheet2" tabs
   await sleep(200)
   await deleteDefaultSheets(ssid)
 }
 
-// (Kept for local tabs use; also wrapped writes in retry)
+/* ===== 2) READ: normalize headers so Status doesn’t fall back to Incoming ===== */
+
+// Canonicalization map (lowercased header → canonical)
+const CANON = {
+  // Products
+  "product": "Product",
+  "brand": "Brand",
+  "status": "Status",
+  "deliverable": "Deliverable",
+  "due date": "Due Date",
+  "cost of product": "Cost of Product",
+  "value (msrp)": "Value (MSRP)",
+  "got as": "Got as",
+  "reimbursed": "Reimbursed",
+  "link": "Link",
+  "note": "Note",
+  // Brand Deals
+  "brand/company": "Brand/Company",
+  "campaign/deal name": "Campaign/Deal Name",
+  "source": "Source",
+  "payment": "Payment",
+  "payment type": "Payment Type",
+  "due date": "Due Date",
+  "deliverables": "Deliverables",
+  "notes": "Notes",
+}
+
 const inflightReads = new Map()
 
 export async function readTab(ssid, tab) {
@@ -299,9 +380,17 @@ export async function readTab(ssid, tab) {
     .then((resp) => {
       const rows = resp.result.values || []
       if (!rows.length) return []
-      const [headers, ...data] = rows
+
+      // Normalize headers: trim & map aliases → canonical keys
+      const rawHeaders = (rows[0] || []).map(h => String(h || "").trim())
+      const headers = rawHeaders.map(h => {
+        const canon = CANON[h.toLowerCase()]
+        return canon || h // if unknown, keep as-is
+      })
+
+      const data = rows.slice(1)
       const mapped = data.map((r) =>
-        Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ""]))
+        Object.fromEntries(headers.map((h, i) => [h, (r[i] ?? "").toString()]))
       )
       return mapped
     })
