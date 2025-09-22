@@ -17,7 +17,36 @@ function loadGapi() {
 // --- small helpers ---
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-// The two scopes TokBoard must have
+// --- redirect recovery: when Google returns with #access_token=... in the URL
+function recoverRedirectTokenFromHash() {
+  try {
+    const hash = window.location.hash || ""
+    if (!hash.includes("access_token=")) return null
+
+    const params = new URLSearchParams(hash.slice(1))
+    const accessToken = params.get("access_token")
+    if (!accessToken) return null
+
+    // Clear the hash so we don’t process it again
+    window.history.replaceState({}, document.title, window.location.pathname + window.location.search)
+
+    // Set into gapi + cache (same shape your code uses)
+    window.gapi?.client?.setToken({ access_token: accessToken })
+    const expiresIn = Number(params.get("expires_in") || 3600)
+    const expiresAt = Date.now() + (expiresIn - 60) * 1000
+    sessionStorage.setItem(
+      "tokboard_token",
+      JSON.stringify({ access_token: accessToken, expires_at: expiresAt })
+    )
+
+    // Return a token-like object for hasGrantedAllScopes(...)
+    return { access_token: accessToken }
+  } catch (_) {
+    return null
+  }
+}
+
+// Scopes TokBoard must have
 export const REQUIRED_SCOPES = [
   "https://www.googleapis.com/auth/drive.file",
   "https://www.googleapis.com/auth/spreadsheets.currentonly",
@@ -25,36 +54,15 @@ export const REQUIRED_SCOPES = [
   "email",
 ]
 
-// Helper: ensure both scopes are granted; if not, alert + force re-consent
-function ensureBothScopesOrReconsent(tokenResponse) {
-  try {
-    const ok = window.google.accounts.oauth2.hasGrantedAllScopes(
-      tokenResponse,
-      ...REQUIRED_SCOPES
-    )
-    if (!ok) {
-      if (!showedScopeAlert) {
-        showedScopeAlert = true
-        alert(
-          "TokBoard needs BOTH permissions:\n\n" +
-          "• Google Drive (files used with this app)\n" +
-          "• Google Sheets (current sheet)\n\n" +
-          "Please check both boxes on the next screen."
-        )
-      }
-      reconsentForRequiredScopes()
-      return false
-    }
-  } catch {}
-  return true
-}
-
 // Detect permission errors from Google APIs
 function isInsufficientPermissions(err) {
   const code = err?.status || err?.result?.error?.code
   const msg  = (err?.result?.error?.message || "").toLowerCase()
   return code === 403 || msg.includes("insufficientpermissions")
 }
+
+// Show the alert just once per page load
+let showedScopeAlert = false
 
 // Kick user back to Google’s consent screen with both boxes required
 export function reconsentForRequiredScopes() {
@@ -65,9 +73,6 @@ export function reconsentForRequiredScopes() {
     include_granted_scopes: true,      // keep already-granted scopes checked
   })
 }
-
-// Show the alert just once per page load
-let showedScopeAlert = false
 
 // Wrap any Drive/Sheets call; if the user unchecked a box, we alert + bounce to consent
 async function with403Retry(
@@ -80,7 +85,6 @@ async function with403Retry(
     if (isInsufficientPermissions(err)) {
       if (!showedScopeAlert) {
         showedScopeAlert = true
-        // 👇 This is the user-facing message you asked for
         alert(
           "TokBoard needs BOTH permissions:\n\n" +
           "• Google Drive (files used with this app)\n" +
@@ -153,7 +157,7 @@ async function deleteDefaultSheets(ssid) {
   }
 }
 
-export async function initGoogle({ apiKey, clientId, scopes }) {
+export async function initGoogle({ apiKey, clientId }) {
   if (gapiInitPromise) return gapiInitPromise
 
   gapiInitPromise = (async () => {
@@ -171,8 +175,9 @@ export async function initGoogle({ apiKey, clientId, scopes }) {
 
     tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      // Always init with BOTH required scopes
       scope: REQUIRED_SCOPES.join(" "),
+      ux_mode: "redirect",
+      redirect_uri: window.location.origin, // MUST be in your OAuth client Authorized redirect URIs
       callback: (resp) => {
         if (!tokenResolver) return
         if (resp && resp.error) tokenResolver.reject(resp)
@@ -189,11 +194,35 @@ export async function ensureToken(prompt = "") {
   if (!gapiInitPromise) throw new Error("gapi not initialized yet")
   if (!tokenClient) throw new Error("tokenClient not initialized yet")
 
+  // 🔁 If we just came back from Google (consent after first-box-only), pick up the token now
+  const recovered = recoverRedirectTokenFromHash()
+  if (recovered?.access_token) {
+    try {
+      const ok = window.google.accounts.oauth2.hasGrantedAllScopes(
+        recovered,
+        ...REQUIRED_SCOPES
+      )
+      if (ok) {
+        // already have all scopes → done
+        return recovered
+      }
+      // Missing scopes → force a re-consent for ALL scopes now
+      tokenClient.requestAccessToken({
+        scope: REQUIRED_SCOPES.join(" "),
+        prompt: "consent",
+        include_granted_scopes: true,
+      })
+      // fall through to normal resolver below
+    } catch {
+      // continue to normal flow
+    }
+  }
+
   return new Promise((resolve, reject) => {
     let attempts = 0
 
     const onToken = (resp) => {
-      // Handle popup issues cleanly so the app doesn't hang
+      // Handle popup/denied issues cleanly
       if (resp?.error) {
         const err = String(resp.error).toLowerCase()
         if (err.includes("popup") || err.includes("access_denied")) {
