@@ -21,6 +21,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 export const REQUIRED_SCOPES = [
   "https://www.googleapis.com/auth/drive.file",
   "https://www.googleapis.com/auth/spreadsheets.currentonly",
+  "openid",
+  "email",
 ]
 
 // Helper: ensure both scopes are granted; if not, alert + force re-consent
