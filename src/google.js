@@ -292,8 +292,20 @@ export async function findOrCreateSpreadsheet() {
 
 // Called AFTER the Sheet is “current” (e.g., iframe onLoad)
 export async function initSheetStructure(ssid) {
-  const parts = [
-    ["Products", ["Product", "Cost of Product", "Note"]],
+   const parts = [
+     ["Products", [
+      "Product",
+      "Brand",
+      "Status",
+      "Deliverable",
+      "Due Date",
+      "Cost of Product",
+      "Value (MSRP)",
+      "Got as",
+      "Reimbursed",
+      "Link",
+      "Note",
+    ]],
     [
       "Brand Deals",
       [
