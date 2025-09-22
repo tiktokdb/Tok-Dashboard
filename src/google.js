@@ -24,7 +24,7 @@ function clearAuthAndRestart() {
   window.location.assign(`${window.location.origin}/`)
 }
 
-/* ===== 1) REQUIRE BOTH SCOPES ===== */
+/* ===== require BOTH scopes ===== */
 export const REQUIRED_SCOPES = [
   "https://www.googleapis.com/auth/drive.file",
   "https://www.googleapis.com/auth/spreadsheets.currentonly",
@@ -32,7 +32,6 @@ export const REQUIRED_SCOPES = [
   "email",
 ]
 
-// one-time alert
 let showedScopeAlert = false
 function scopeAlertOnce() {
   if (showedScopeAlert) return
@@ -45,7 +44,27 @@ function scopeAlertOnce() {
   )
 }
 
-// If Google throws permission errors while calling APIs, bounce user to restart
+// Read actual scopes from the token (bullet-proof)
+async function verifyTokenScopes(accessToken) {
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
+    )
+    if (!res.ok) return false
+    const json = await res.json()
+    const granted = new Set(String(json.scope || "").split(/\s+/).filter(Boolean))
+    // Must include BOTH Drive + Sheets
+    const need = [
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/spreadsheets.currentonly",
+    ]
+    return need.every(s => granted.has(s))
+  } catch {
+    return false
+  }
+}
+
+// If Google throws permission errors during API calls, bounce user to restart
 function isInsufficientPermissions(err) {
   const code = err?.status || err?.result?.error?.code
   const msg  = (err?.result?.error?.message || "").toLowerCase()
@@ -59,9 +78,8 @@ async function with403Retry(fn, { retries = 1, delayMs = 1200 } = {}) {
     if (isInsufficientPermissions(err)) {
       scopeAlertOnce()
       clearAuthAndRestart()
-      return // navigation
+      return
     }
-    // If it's not a scopes issue, keep the small retry behavior you had
     const status = err?.status || err?.result?.error?.code
     if (status === 403 && retries > 0) {
       await sleep(delayMs)
@@ -71,7 +89,7 @@ async function with403Retry(fn, { retries = 1, delayMs = 1200 } = {}) {
   }
 }
 
-/* ===== sheets utils you already had ===== */
+/* ===== Sheets helpers ===== */
 
 async function deleteSheetsIfExist(ssid, titles) {
   try {
@@ -87,9 +105,7 @@ async function deleteSheetsIfExist(ssid, titles) {
       await with403Retry(() =>
         window.gapi.client.sheets.spreadsheets.batchUpdate({
           spreadsheetId: ssid,
-          resource: {
-            requests: toDelete.map(id => ({ deleteSheet: { sheetId: id } })),
-          },
+          resource: { requests: toDelete.map(id => ({ deleteSheet: { sheetId: id } })) },
         })
       )
     }
@@ -104,7 +120,6 @@ async function deleteDefaultSheets(ssid) {
       spreadsheetId: ssid,
       includeGridData: false,
     })
-
     const isDefaultTitle = (t) => /^Sheet(\s?\d+)?$/i.test((t || "").trim())
     const keep = new Set(["Products", "Brand Deals", "Completed Deals"])
 
@@ -145,7 +160,6 @@ export async function initGoogle({ apiKey, clientId, scopes }) {
     tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: scopes || REQUIRED_SCOPES.join(" "),
-      // keep popup (default). redirect complicates flows.
       callback: (resp) => {
         if (!tokenResolver) return
         if (resp && resp.error) tokenResolver.reject(resp)
@@ -164,7 +178,7 @@ export async function ensureToken(prompt = "consent") {
 
   return new Promise((resolve, reject) => {
     tokenResolver = {
-      resolve: (resp) => {
+      resolve: async (resp) => {
         // Handle popup/denied
         if (resp?.error) {
           const err = String(resp.error).toLowerCase()
@@ -191,16 +205,13 @@ export async function ensureToken(prompt = "consent") {
           console.warn("⚠️ Could not persist token:", e)
         }
 
-        // ✅ REQUIRE BOTH BOXES
-        let ok = false
-        try {
-          ok = window.google.accounts.oauth2.hasGrantedAllScopes(resp, ...REQUIRED_SCOPES)
-        } catch {}
-
+        // 🔒 Verify scopes via tokeninfo (don’t trust UI checkboxes)
+        const token = resp?.access_token
+        const ok = token ? await verifyTokenScopes(token) : false
         if (!ok) {
           scopeAlertOnce()
-          clearAuthAndRestart()  // wipe partial token & send back to landing
-          return                 // navigation, don’t resolve
+          clearAuthAndRestart() // wipe + kick back to landing
+          return
         }
 
         resolve(resp)
@@ -233,7 +244,7 @@ export async function fetchUserEmail() {
   return (data.email || "").toLowerCase()
 }
 
-/* ===== drive/sheets entry points ===== */
+/* ===== Drive / Sheets entry points ===== */
 
 let creatingPromise = null
 
@@ -321,9 +332,7 @@ export async function initSheetStructure(ssid) {
           resource: { requests: [{ addSheet: { properties: { title } } }] },
         })
       )
-    } catch (e) {
-      // Already exists — ignore
-    }
+    } catch (e) {}
 
     await with403Retry(() =>
       window.gapi.client.sheets.spreadsheets.values.update({
@@ -339,9 +348,8 @@ export async function initSheetStructure(ssid) {
   await deleteDefaultSheets(ssid)
 }
 
-/* ===== 2) READ: normalize headers so Status doesn’t fall back to Incoming ===== */
+/* ===== read/write with header normalization ===== */
 
-// Canonicalization map (lowercased header → canonical)
 const CANON = {
   // Products
   "product": "Product",
@@ -361,7 +369,6 @@ const CANON = {
   "source": "Source",
   "payment": "Payment",
   "payment type": "Payment Type",
-  "due date": "Due Date",
   "deliverables": "Deliverables",
   "notes": "Notes",
 }
@@ -373,26 +380,18 @@ export async function readTab(ssid, tab) {
   if (inflightReads.has(key)) return inflightReads.get(key)
 
   const p = window.gapi.client.sheets.spreadsheets.values
-    .get({
-      spreadsheetId: ssid,
-      range: `${tab}!A:Z`,
-    })
+    .get({ spreadsheetId: ssid, range: `${tab}!A:Z` })
     .then((resp) => {
       const rows = resp.result.values || []
       if (!rows.length) return []
 
-      // Normalize headers: trim & map aliases → canonical keys
       const rawHeaders = (rows[0] || []).map(h => String(h || "").trim())
-      const headers = rawHeaders.map(h => {
-        const canon = CANON[h.toLowerCase()]
-        return canon || h // if unknown, keep as-is
-      })
+      const headers = rawHeaders.map(h => CANON[h.toLowerCase()] || h)
 
       const data = rows.slice(1)
-      const mapped = data.map((r) =>
+      return data.map((r) =>
         Object.fromEntries(headers.map((h, i) => [h, (r[i] ?? "").toString()]))
       )
-      return mapped
     })
     .catch((err) => {
       console.error("❌ readTab error:", err)
