@@ -24,6 +24,31 @@ export const REQUIRED_SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets.currentonly",
 ]
 
+ // Helper: ensure both scopes are granted; if not, alert + force re-consent
+ function ensureBothScopesOrReconsent(tokenResponse) {
+   try {
+     const ok = window.google.accounts.oauth2.hasGrantedAllScopes(
+       tokenResponse,
+       ...REQUIRED_SCOPES
+     )
+     if (!ok) {
+       if (!showedScopeAlert) {
+         showedScopeAlert = true
+         alert(
+           "TokBoard needs BOTH permissions:\n\n" +
+           "• Google Drive (files used with this app)\n" +
+           "• Google Sheets (current sheet)\n\n" +
+           "Please check both boxes on the next screen."
+         )
+       }
+       reconsentForRequiredScopes()
+       return false
+     }
+   } catch {}
+   return true
+ }
+
+
 // Detect permission errors from Google APIs
 function isInsufficientPermissions(err) {
   const code = err?.status || err?.result?.error?.code
@@ -153,6 +178,7 @@ export async function initGoogle({ apiKey, clientId, scopes }) {
       scope: scopes,
       ux_mode: "redirect",
       redirect_uri: window.location.origin,
+      scope: REQUIRED_SCOPES.join(" "),
       callback: (resp) => {
         if (!tokenResolver) return
         if (resp && resp.error) tokenResolver.reject(resp)
@@ -176,6 +202,7 @@ export async function ensureToken(prompt = "") {
           if (resp?.access_token) {
             window.gapi?.client?.setToken({ access_token: resp.access_token })
           }
+          ensureBothScopesOrReconsent(resp)
           try {
             const expiresAt = Date.now() + ((resp?.expires_in || 3600) - 60) * 1000
             sessionStorage.setItem(
@@ -195,6 +222,10 @@ export async function ensureToken(prompt = "") {
 
     try {
       tokenClient.requestAccessToken({ prompt })
+      tokenClient.requestAccessToken({
+         scope: REQUIRED_SCOPES.join(" "),
+         prompt,
+       })
     } catch (err) {
       console.error("❌ Exception when calling requestAccessToken:", err)
       reject(err)
