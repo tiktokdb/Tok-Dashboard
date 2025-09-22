@@ -15,7 +15,6 @@ function loadGapi() {
 }
 
 // --- small helpers ---
-// --- small helpers ---
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 // The two scopes TokBoard must have
@@ -24,30 +23,29 @@ export const REQUIRED_SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets.currentonly",
 ]
 
- // Helper: ensure both scopes are granted; if not, alert + force re-consent
- function ensureBothScopesOrReconsent(tokenResponse) {
-   try {
-     const ok = window.google.accounts.oauth2.hasGrantedAllScopes(
-       tokenResponse,
-       ...REQUIRED_SCOPES
-     )
-     if (!ok) {
-       if (!showedScopeAlert) {
-         showedScopeAlert = true
-         alert(
-           "TokBoard needs BOTH permissions:\n\n" +
-           "• Google Drive (files used with this app)\n" +
-           "• Google Sheets (current sheet)\n\n" +
-           "Please check both boxes on the next screen."
-         )
-       }
-       reconsentForRequiredScopes()
-       return false
-     }
-   } catch {}
-   return true
- }
-
+// Helper: ensure both scopes are granted; if not, alert + force re-consent
+function ensureBothScopesOrReconsent(tokenResponse) {
+  try {
+    const ok = window.google.accounts.oauth2.hasGrantedAllScopes(
+      tokenResponse,
+      ...REQUIRED_SCOPES
+    )
+    if (!ok) {
+      if (!showedScopeAlert) {
+        showedScopeAlert = true
+        alert(
+          "TokBoard needs BOTH permissions:\n\n" +
+          "• Google Drive (files used with this app)\n" +
+          "• Google Sheets (current sheet)\n\n" +
+          "Please check both boxes on the next screen."
+        )
+      }
+      reconsentForRequiredScopes()
+      return false
+    }
+  } catch {}
+  return true
+}
 
 // Detect permission errors from Google APIs
 function isInsufficientPermissions(err) {
@@ -100,7 +98,6 @@ async function with403Retry(
   }
 }
 
-
 async function deleteSheetsIfExist(ssid, titles) {
   try {
     const meta = await window.gapi.client.sheets.spreadsheets.get({
@@ -134,10 +131,7 @@ async function deleteDefaultSheets(ssid) {
       includeGridData: false,
     })
 
-    // Titles like Google's defaults: "Sheet", "Sheet1", "Sheet 1", "Sheet2", ...
     const isDefaultTitle = (t) => /^Sheet(\s?\d+)?$/i.test((t || "").trim())
-
-    // Never delete our real tabs
     const keep = new Set(["Products", "Brand Deals", "Completed Deals"])
 
     const toDelete = (meta.result.sheets || [])
@@ -175,9 +169,7 @@ export async function initGoogle({ apiKey, clientId, scopes }) {
 
     tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      scope: scopes,
-      ux_mode: "redirect",
-      redirect_uri: window.location.origin,
+      // Always init with BOTH required scopes
       scope: REQUIRED_SCOPES.join(" "),
       callback: (resp) => {
         if (!tokenResolver) return
@@ -196,38 +188,83 @@ export async function ensureToken(prompt = "") {
   if (!tokenClient) throw new Error("tokenClient not initialized yet")
 
   return new Promise((resolve, reject) => {
-    tokenResolver = {
-      resolve: (resp) => {
-        try {
-          if (resp?.access_token) {
-            window.gapi?.client?.setToken({ access_token: resp.access_token })
-          }
-          ensureBothScopesOrReconsent(resp)
-          try {
-            const expiresAt = Date.now() + ((resp?.expires_in || 3600) - 60) * 1000
-            sessionStorage.setItem(
-              "tokboard_token",
-              JSON.stringify({ access_token: resp.access_token, expires_at: expiresAt })
-            )
-          } catch (e) {
-            console.warn("⚠️ Could not persist token:", e)
-          }
-        } catch (e) {
-          console.warn("⚠️ Could not set gapi token from resp:", e)
+    let attempts = 0
+
+    const onToken = (resp) => {
+      // Handle popup issues cleanly so the app doesn't hang
+      if (resp?.error) {
+        const err = String(resp.error).toLowerCase()
+        if (err.includes("popup") || err.includes("access_denied")) {
+          alert(
+            "Please allow pop-ups for TokBoard, then click Continue again.\n\n" +
+            "(If you just enabled pop-ups, click Continue once more to reopen Google.)"
+          )
+          return reject(resp)
         }
-        resolve(resp)
-      },
-      reject,
+        return reject(resp)
+      }
+
+      try {
+        if (resp?.access_token) {
+          window.gapi?.client?.setToken({ access_token: resp.access_token })
+          const expiresAt = Date.now() + ((resp?.expires_in || 3600) - 60) * 1000
+          sessionStorage.setItem(
+            "tokboard_token",
+            JSON.stringify({ access_token: resp.access_token, expires_at: expiresAt })
+          )
+        }
+      } catch (e) {
+        console.warn("⚠️ Could not persist token:", e)
+      }
+
+      // Require BOTH boxes; if missing, alert + force re-consent and WAIT
+      let ok = false
+      try {
+        ok = window.google.accounts.oauth2.hasGrantedAllScopes(
+          resp,
+          ...REQUIRED_SCOPES
+        )
+      } catch {}
+
+      if (ok) return resolve(resp)
+
+      if (!showedScopeAlert) {
+        showedScopeAlert = true
+        alert(
+          "TokBoard needs BOTH permissions:\n\n" +
+          "• Google Drive (files used with this app)\n" +
+          "• Google Sheets (current sheet)\n\n" +
+          "Please check both boxes on the next screen."
+        )
+      }
+
+      attempts += 1
+      if (attempts > 1) {
+        // User canceled or still missing scopes; let caller trigger another try on click
+        return reject(new Error("User did not grant both required scopes"))
+      }
+
+      // Wire resolver for the NEXT token and force consent with both scopes
+      tokenResolver = { resolve: onToken, reject }
+      try {
+        tokenClient.requestAccessToken({
+          scope: REQUIRED_SCOPES.join(" "),
+          prompt: "consent",
+          include_granted_scopes: true,
+        })
+      } catch (err) {
+        return reject(err)
+      }
     }
 
+    // Wire resolver for the FIRST token and request both scopes up front
+    tokenResolver = { resolve: onToken, reject }
     try {
-      tokenClient.requestAccessToken({ prompt })
       tokenClient.requestAccessToken({
-         scope: REQUIRED_SCOPES.join(" "),
-         prompt,
-       })
+        scope: REQUIRED_SCOPES.join(" "),
+        prompt, // "" (silent if possible) or "consent" from a user click
+      })
     } catch (err) {
-      console.error("❌ Exception when calling requestAccessToken:", err)
       reject(err)
     }
   })
