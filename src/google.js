@@ -24,30 +24,29 @@ export const REQUIRED_SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets.currentonly",
 ]
 
- // Helper: ensure both scopes are granted; if not, alert + force re-consent
- function ensureBothScopesOrReconsent(tokenResponse) {
-   try {
-     const ok = window.google.accounts.oauth2.hasGrantedAllScopes(
-       tokenResponse,
-       ...REQUIRED_SCOPES
-     )
-     if (!ok) {
-       if (!showedScopeAlert) {
-         showedScopeAlert = true
-         alert(
-           "TokBoard needs BOTH permissions:\n\n" +
-           "• Google Drive (files used with this app)\n" +
-           "• Google Sheets (current sheet)\n\n" +
-           "Please check both boxes on the next screen."
-         )
-       }
-       reconsentForRequiredScopes()
-       return false
-     }
-   } catch {}
-   return true
- }
-
+// Helper: ensure both scopes are granted; if not, alert + force re-consent
+function ensureBothScopesOrReconsent(tokenResponse) {
+  try {
+    const ok = window.google.accounts.oauth2.hasGrantedAllScopes(
+      tokenResponse,
+      ...REQUIRED_SCOPES
+    )
+    if (!ok) {
+      if (!showedScopeAlert) {
+        showedScopeAlert = true
+        alert(
+          "TokBoard needs BOTH permissions:\n\n" +
+          "• Google Drive (files used with this app)\n" +
+          "• Google Sheets (current sheet)\n\n" +
+          "Please check both boxes on the next screen."
+        )
+      }
+      reconsentForRequiredScopes()
+      return false
+    }
+  } catch {}
+  return true
+}
 
 // Detect permission errors from Google APIs
 function isInsufficientPermissions(err) {
@@ -99,7 +98,6 @@ async function with403Retry(
     throw err
   }
 }
-
 
 async function deleteSheetsIfExist(ssid, titles) {
   try {
@@ -196,38 +194,70 @@ export async function ensureToken(prompt = "") {
   if (!tokenClient) throw new Error("tokenClient not initialized yet")
 
   return new Promise((resolve, reject) => {
-    tokenResolver = {
-      resolve: (resp) => {
-        try {
-          if (resp?.access_token) {
-            window.gapi?.client?.setToken({ access_token: resp.access_token })
-          }
-          ensureBothScopesOrReconsent(resp)
-          try {
-            const expiresAt = Date.now() + ((resp?.expires_in || 3600) - 60) * 1000
-            sessionStorage.setItem(
-              "tokboard_token",
-              JSON.stringify({ access_token: resp.access_token, expires_at: expiresAt })
-            )
-          } catch (e) {
-            console.warn("⚠️ Could not persist token:", e)
-          }
-        } catch (e) {
-          console.warn("⚠️ Could not set gapi token from resp:", e)
+    let attempts = 0
+
+    const onToken = (resp) => {
+      if (resp?.error) return reject(resp)
+      try {
+        if (resp?.access_token) {
+          window.gapi?.client?.setToken({ access_token: resp.access_token })
+          const expiresAt = Date.now() + ((resp?.expires_in || 3600) - 60) * 1000
+          sessionStorage.setItem(
+            "tokboard_token",
+            JSON.stringify({ access_token: resp.access_token, expires_at: expiresAt })
+          )
         }
-        resolve(resp)
-      },
-      reject,
+      } catch (e) {
+        console.warn("⚠️ Could not persist token:", e)
+      }
+
+      // Require BOTH boxes; if missing, alert + force re-consent and WAIT
+      let ok = false
+      try {
+        ok = window.google.accounts.oauth2.hasGrantedAllScopes(
+          resp,
+          ...REQUIRED_SCOPES
+        )
+      } catch {}
+
+      if (ok) return resolve(resp)
+
+      if (!showedScopeAlert) {
+        showedScopeAlert = true
+        alert(
+          "TokBoard needs BOTH permissions:\n\n" +
+          "• Google Drive (files used with this app)\n" +
+          "• Google Sheets (current sheet)\n\n" +
+          "Please check both boxes on the next screen."
+        )
+      }
+
+      attempts += 1
+      if (attempts > 1) {
+        return reject(new Error("User did not grant both required scopes"))
+      }
+
+      // Wire resolver for the NEXT token and force consent with both scopes
+      tokenResolver = { resolve: onToken, reject }
+      try {
+        tokenClient.requestAccessToken({
+          scope: REQUIRED_SCOPES.join(" "),
+          prompt: "consent",
+          include_granted_scopes: true,
+        })
+      } catch (err) {
+        return reject(err)
+      }
     }
 
+    // Wire resolver for the FIRST token and request both scopes up front
+    tokenResolver = { resolve: onToken, reject }
     try {
-      tokenClient.requestAccessToken({ prompt })
       tokenClient.requestAccessToken({
-         scope: REQUIRED_SCOPES.join(" "),
-         prompt,
-       })
+        scope: REQUIRED_SCOPES.join(" "),
+        prompt, // "" for silent-if-possible; "consent" to always show
+      })
     } catch (err) {
-      console.error("❌ Exception when calling requestAccessToken:", err)
       reject(err)
     }
   })
