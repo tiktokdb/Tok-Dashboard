@@ -131,17 +131,33 @@ const HEADERS = [
 ] // A..K
 
 async function ensureSheetExists(ssid, title) {
+  // Ensure the sheet (tab) exists without triggering a values read.
   try {
-    await readTabDedup(ssid, title)
+    const meta = await window.gapi.client.sheets.spreadsheets.get({
+      spreadsheetId: ssid,
+      includeGridData: false,
+    });
+    const has = (meta.result.sheets || []).some(
+      (s) => s.properties?.title === title
+    );
+    if (!has) {
+      await window.gapi.client.sheets.spreadsheets.batchUpdate({
+        spreadsheetId: ssid,
+        resource: { requests: [{ addSheet: { properties: { title } } }] },
+      });
+    }
   } catch {
+    // best effort: if meta fails, still attempt to add
     try {
       await window.gapi.client.sheets.spreadsheets.batchUpdate({
         spreadsheetId: ssid,
         resource: { requests: [{ addSheet: { properties: { title } } }] },
-      })
+      });
     } catch {}
   }
-  await ensureHeaders(ssid, title)
+
+  // Always normalize headers BEFORE the first real read.
+  await ensureHeaders(ssid, title);
 }
 
 /* Always normalize the header row to our latest HEADERS (safe even on old tabs) */
@@ -322,6 +338,8 @@ useEffect(() => {
     try {
       await ensureSheetExists(ssid, ACTIVE_TAB);
       await ensureSheetExists(ssid, POSTED_TAB);
+
+      await delay(30);
 
       const [active, posted] = await Promise.all([
         withRetry(() => readTabDedup(ssid, ACTIVE_TAB), 1),
