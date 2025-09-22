@@ -2,7 +2,6 @@
 
 let gapiInitPromise = null
 let tokenClient = null
-let tokenResolver = null
 
 function loadGapi() {
   return new Promise((resolve) => {
@@ -17,16 +16,51 @@ function loadGapi() {
 // --- small helpers ---
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-async function with403Retry(fn, { retries = 1, delayMs = 1200 } = {}) {
+function clearAuthAndRestart() {
+  try { window.gapi?.client?.setToken(null) } catch {}
+  try { sessionStorage.removeItem("tokboard_token") } catch {}
+  try { sessionStorage.removeItem("tokboard_ssid") } catch {}
+  // Hard restart to the landing/login (root)
+  window.location.assign(`${window.location.origin}/`)
+}
+
+// Scopes TokBoard must have
+export const REQUIRED_SCOPES = [
+  "https://www.googleapis.com/auth/drive.file",
+  "https://www.googleapis.com/auth/spreadsheets.currentonly",
+  "openid",
+  "email",
+]
+
+// Detect permission errors from Google APIs
+function isInsufficientPermissions(err) {
+  const code = err?.status || err?.result?.error?.code
+  const msg  = (err?.result?.error?.message || "").toLowerCase()
+  return code === 403 || msg.includes("insufficientpermissions")
+}
+
+// Show the alert just once per page load
+let showedScopeAlert = false
+function scopeAlertOnce() {
+  if (showedScopeAlert) return
+  showedScopeAlert = true
+  alert(
+    "TokBoard needs BOTH permissions:\n\n" +
+    "• Google Drive (files used with this app)\n" +
+    "• Google Sheets (current sheet)\n\n" +
+    "Please check both boxes. You'll be sent back to the sign-in screen to try again."
+  )
+}
+
+// Wrap any Drive/Sheets call; if the user unchecked a box, tell them and restart
+async function with403Retry(fn) {
   try {
     return await fn()
   } catch (err) {
-    const status = err?.status || err?.result?.error?.code
-    const is403 = status === 403
-    // If currentonly isn’t “current” yet, the first write can 403. Retry once.
-    if (is403 && retries > 0) {
-      await sleep(delayMs)
-      return with403Retry(fn, { retries: retries - 1, delayMs })
+    if (isInsufficientPermissions(err)) {
+      scopeAlertOnce()
+      clearAuthAndRestart()
+      return // never reaches here (page navigates)
     }
     throw err
   }
@@ -65,10 +99,7 @@ async function deleteDefaultSheets(ssid) {
       includeGridData: false,
     })
 
-    // Titles like Google's defaults: "Sheet", "Sheet1", "Sheet 1", "Sheet2", ...
     const isDefaultTitle = (t) => /^Sheet(\s?\d+)?$/i.test((t || "").trim())
-
-    // Never delete our real tabs
     const keep = new Set(["Products", "Brand Deals", "Completed Deals"])
 
     const toDelete = (meta.result.sheets || [])
@@ -88,7 +119,7 @@ async function deleteDefaultSheets(ssid) {
   }
 }
 
-export async function initGoogle({ apiKey, clientId, scopes }) {
+export async function initGoogle({ apiKey, clientId }) {
   if (gapiInitPromise) return gapiInitPromise
 
   gapiInitPromise = (async () => {
@@ -104,16 +135,13 @@ export async function initGoogle({ apiKey, clientId, scopes }) {
       ],
     })
 
+    // Use POPUP (simpler) and fail-fast if scopes are incomplete
     tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      scope: scopes,
-      ux_mode: "redirect",
-      redirect_uri: window.location.origin,
+      scope: REQUIRED_SCOPES.join(" "),
+      // popup ux_mode is default; we keep it that way for simplicity
       callback: (resp) => {
-        if (!tokenResolver) return
-        if (resp && resp.error) tokenResolver.reject(resp)
-        else tokenResolver.resolve(resp)
-        tokenResolver = null
+        // we don't resolve here; ensureToken handles it
       },
     })
   })()
@@ -121,38 +149,63 @@ export async function initGoogle({ apiKey, clientId, scopes }) {
   return gapiInitPromise
 }
 
-export async function ensureToken(prompt = "") {
+export async function ensureToken(prompt = "consent") {
   if (!gapiInitPromise) throw new Error("gapi not initialized yet")
   if (!tokenClient) throw new Error("tokenClient not initialized yet")
 
   return new Promise((resolve, reject) => {
-    tokenResolver = {
-      resolve: (resp) => {
-        try {
-          if (resp?.access_token) {
-            window.gapi?.client?.setToken({ access_token: resp.access_token })
-          }
-          try {
-            const expiresAt = Date.now() + ((resp?.expires_in || 3600) - 60) * 1000
-            sessionStorage.setItem(
-              "tokboard_token",
-              JSON.stringify({ access_token: resp.access_token, expires_at: expiresAt })
-            )
-          } catch (e) {
-            console.warn("⚠️ Could not persist token:", e)
-          }
-        } catch (e) {
-          console.warn("⚠️ Could not set gapi token from resp:", e)
+    const onToken = (resp) => {
+      // User closed popup or denied
+      if (resp?.error) {
+        const err = String(resp.error).toLowerCase()
+        if (err.includes("popup") || err.includes("access_denied")) {
+          alert(
+            "Please allow pop-ups for TokBoard, then click Sign in again.\n\n" +
+            "(If you just enabled pop-ups, click Sign in once more.)"
+          )
         }
+        return reject(resp)
+      }
+
+      // Save token
+      try {
+        if (resp?.access_token) {
+          window.gapi?.client?.setToken({ access_token: resp.access_token })
+          const expiresAt = Date.now() + ((resp?.expires_in || 3600) - 60) * 1000
+          sessionStorage.setItem(
+            "tokboard_token",
+            JSON.stringify({ access_token: resp.access_token, expires_at: expiresAt })
+          )
+        }
+      } catch (e) {
+        console.warn("⚠️ Could not persist token:", e)
+      }
+
+      // Check scopes
+      let ok = false
+      try {
+        ok = window.google.accounts.oauth2.hasGrantedAllScopes(resp, ...REQUIRED_SCOPES)
+      } catch {}
+
+      if (ok) {
         resolve(resp)
-      },
-      reject,
+        return
+      }
+
+      // Not all scopes → tell them, wipe token, and restart to landing
+      scopeAlertOnce()
+      clearAuthAndRestart()
+      // no resolve/reject; navigation happens
     }
 
+    // Request token once
     try {
-      tokenClient.requestAccessToken({ prompt })
+      tokenClient.callback = onToken
+      tokenClient.requestAccessToken({
+        scope: REQUIRED_SCOPES.join(" "),
+        prompt, // "consent" on first click keeps the checkboxes visible
+      })
     } catch (err) {
-      console.error("❌ Exception when calling requestAccessToken:", err)
       reject(err)
     }
   })
