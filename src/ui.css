@@ -411,3 +411,13 @@ td textarea:focus {
   transition: filter .12s ease, transform .12s ease;
 }
 .btn-ghost:hover { filter: brightness(1.06); transform: translateY(-1px); }
+
+/* ===== Desktop: widen page and remove table H-scroll ===== */
+@media (min-width: 1200px) {
+  .page { 
+    width: min(1700px, 98vw);  /* was 1500px */
+  }
+  .tableWrap.card {
+    overflow-x: visible;       /* stop showing the horizontal scrollbar on desktop */
+  }
+}
