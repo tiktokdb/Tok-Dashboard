@@ -307,6 +307,21 @@ export default function LandingPage({ onSignedIn, error }) {
         .lightbox-nav.prev { left: 10px; }
         .lightbox-nav.next { right: 10px; }
         .lightbox-close:hover, .lightbox-nav:hover { filter: brightness(1.08); }
+
+        .beta {
+        display: inline-flex;
+        align-items: center;
+        margin-left: 10px;
+        padding: 4px 8px;
+        font-size: 12px;
+        font-weight: 800;
+        border-radius: 999px;
+        color: #dbeafe;
+        background: rgba(59,130,246,.18);
+        border: 1px solid rgba(59,130,246,.35);
+        vertical-align: middle;
+        transform: translateY(-4px);
+      }
       `}</style>
 
       <div className="fx" aria-hidden="true" />
@@ -327,7 +342,9 @@ export default function LandingPage({ onSignedIn, error }) {
             )}
           </div>
 
-          <h1 className="title">TokBoard</h1>
+          <h1 className="title">
+            TokBoard <span className="beta">Beta</span>
+          </h1>
           <p className="tag">
             Track creator products & posts — powered by your own Google Sheet.
           </p>
@@ -371,14 +388,6 @@ export default function LandingPage({ onSignedIn, error }) {
         <button className="cta" onClick={handleSignInClick} disabled={signingIn}>
           {signingIn ? "Redirecting…" : "Sign in with Google"}
         </button>
-
-        {/* Unverified app notice (more visible) */}
-        <div className="notice">
-          ⚠️ First time signing in? Google may show a warning that says
-          <i> “Google hasn’t verified this app.”</i><br />
-          Just click <b>Advanced → Go to tokboard.net (unsafe)</b> to continue.
-          You’ll only need to do this once while we’re waiting on Google’s verification.
-        </div>
 
         {/* Plans toggle button (higher contrast than a link) */}
         <div style={{ textAlign: "center" }}>
