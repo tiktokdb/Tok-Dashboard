@@ -390,7 +390,7 @@ export default function LandingPage({ onSignedIn, error }) {
         </button>
 
         {/* Plans toggle button (higher contrast than a link) */}
-        <div style={{ textAlign: "center" }}>
+        <div style={{ textAlign: "center", marginTop: 12 }}>
           <button
             type="button"
             className="btn-ghost"
