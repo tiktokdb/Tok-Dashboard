@@ -18,12 +18,6 @@ export default function LandingPage({ onSignedIn, error }) {
   // --- Lightbox state + data ---
   const [lightboxIndex, setLightboxIndex] = useState/** @type {number|null} */(null);
 
-    // TikTok: page view on landing
-  useEffect(() => {
-    track("PageView", { page: "Landing" });
-  }, []);
-
-
   const peekImages = [
     { src: "/tokboard_crop_kpis.png",    alt: "TokBoard KPI cards",               caption: "At-a-glance KPIs" },
     { src: "/tokboard_crop_filters.png", alt: "TokBoard filters & quick actions", caption: "Filters & quick actions" },
@@ -69,8 +63,8 @@ export default function LandingPage({ onSignedIn, error }) {
   async function handleSignInClick() {
     setSigningIn(true);
     try {
+      track("ClickButton", { content_name: "Sign in with Google", content_type: "cta" });
       await ensureToken("consent"); // may redirect
-      track("ClickButton", { label: "Sign in with Google" });
 
       const tok = window.gapi?.client?.getToken?.();
       if (tok?.access_token) {
@@ -406,7 +400,7 @@ export default function LandingPage({ onSignedIn, error }) {
           type="button"
           className="btn-ghost"
           onClick={() => {
-            track("ClickButton", { label: "See plans & pricing" });
+            track("ClickButton", { content_name: "See plans & pricing", content_type: "cta" });
             setShowPlans((s) => !s);
           }}
         >
@@ -432,12 +426,23 @@ export default function LandingPage({ onSignedIn, error }) {
                 margin: "10px auto 0"
               }}
             >
-              <a className="cta" style={{ textAlign: "center" }} href={STRIPE_LINK_MONTHLY}>
-                $5.99 / month
-              </a>
-              <a className="cta" style={{ textAlign: "center" }} href={STRIPE_LINK_YEARLY}>
-                $39.99 / year
-              </a>
+              <a
+              className="cta"
+              style={{ textAlign: "center" }}
+              href={STRIPE_LINK_MONTHLY}
+              onClick={() => track("ClickButton", { content_name: "Monthly plan", content_type: "pricing" })}
+            >
+              $5.99 / month
+            </a>
+
+            <a
+              className="cta"
+              style={{ textAlign: "center" }}
+              href={STRIPE_LINK_YEARLY}
+              onClick={() => track("ClickButton", { content_name: "Yearly plan", content_type: "pricing" })}
+            >
+              $39.99 / year
+            </a>
             </div>
             <p className="fine">
               After checkout, return here and sign in again—access unlocks automatically
