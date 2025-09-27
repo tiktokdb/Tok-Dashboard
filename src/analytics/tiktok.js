@@ -1,9 +1,19 @@
 // src/analytics/tiktok.js
-import { v4 as uuid } from "uuid"; // npm i uuid
+import { v4 as uuid } from "uuid";
 
 export function track(event, props = {}) {
   const event_id = uuid();
-  // Browser (Pixel) event
   window.ttq?.track?.(event, { ...props, event_id });
-  // If/when you add a serverless endpoint, POST the same event_id there for de-dupe
+}
+
+export async function identifyUser(email) {
+  if (!email) return;
+  try {
+    const enc = new TextEncoder().encode(email.trim().toLowerCase());
+    const buf = await crypto.subtle.digest("SHA-256", enc); // requires HTTPS (which you have)
+    const hash = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+    window.ttq?.identify?.({ email: hash });
+  } catch (_) {
+    // silently ignore if hashing not supported
+  }
 }

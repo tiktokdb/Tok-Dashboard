@@ -6,7 +6,7 @@ import React, { useEffect, useState } from "react";
 import { ensureToken, fetchUserEmail } from "./google";
 import { isAllowedEmail, STRIPE_LINK_MONTHLY, STRIPE_LINK_YEARLY } from "./allowlist";
 
-import { track } from "./analytics/tiktok";
+import { track, identifyUser } from "./analytics/tiktok";
 
 
 export default function LandingPage({ onSignedIn, error }) {
@@ -85,6 +85,7 @@ export default function LandingPage({ onSignedIn, error }) {
              return;
            }
           // Allowed → proceed
+          await identifyUser(em); // hash + send email for AAM
           track("CompleteRegistration", { method: "Google" }); 
           onSignedIn?.(em);
           setSigningIn(false);
