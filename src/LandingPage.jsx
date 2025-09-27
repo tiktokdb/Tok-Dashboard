@@ -430,7 +430,7 @@ export default function LandingPage({ onSignedIn, error }) {
               className="cta"
               style={{ textAlign: "center" }}
               href={STRIPE_LINK_MONTHLY}
-              onClick={() => track("ClickButton", { content_name: "Monthly plan", content_type: "pricing" })}
+               onMouseDown={() => track("ClickButton", { content_name: "Monthly plan", content_type: "pricing" })}
             >
               $5.99 / month
             </a>
@@ -439,7 +439,7 @@ export default function LandingPage({ onSignedIn, error }) {
               className="cta"
               style={{ textAlign: "center" }}
               href={STRIPE_LINK_YEARLY}
-              onClick={() => track("ClickButton", { content_name: "Yearly plan", content_type: "pricing" })}
+               onMouseDown={() => track("ClickButton", { content_name: "Yearly plan", content_type: "pricing" })}
             >
               $39.99 / year
             </a>
