@@ -18,6 +18,17 @@ export default function LandingPage({ onSignedIn, error }) {
   // --- Lightbox state + data ---
   const [lightboxIndex, setLightboxIndex] = useState/** @type {number|null} */(null);
 
+  // ⬇️ ADD THIS HELPER HERE
+  function handlePlanClick(url, name) {
+    return (e) => {
+      e.preventDefault(); // stop immediate nav
+      track("ClickButton", { content_name: name, content_type: "pricing" });
+      setTimeout(() => {
+        window.location.href = url; // then navigate
+      }, 200);
+    };
+  }
+
   const peekImages = [
     { src: "/tokboard_crop_kpis.png",    alt: "TokBoard KPI cards",               caption: "At-a-glance KPIs" },
     { src: "/tokboard_crop_filters.png", alt: "TokBoard filters & quick actions", caption: "Filters & quick actions" },
@@ -430,7 +441,7 @@ export default function LandingPage({ onSignedIn, error }) {
               className="cta"
               style={{ textAlign: "center" }}
               href={STRIPE_LINK_MONTHLY}
-               onMouseDown={() => track("ClickButton", { content_name: "Monthly plan", content_type: "pricing" })}
+              onClick={handlePlanClick(STRIPE_LINK_MONTHLY, "Monthly plan")}
             >
               $5.99 / month
             </a>
@@ -439,7 +450,7 @@ export default function LandingPage({ onSignedIn, error }) {
               className="cta"
               style={{ textAlign: "center" }}
               href={STRIPE_LINK_YEARLY}
-               onMouseDown={() => track("ClickButton", { content_name: "Yearly plan", content_type: "pricing" })}
+              onClick={handlePlanClick(STRIPE_LINK_YEARLY, "Yearly plan")}
             >
               $39.99 / year
             </a>
