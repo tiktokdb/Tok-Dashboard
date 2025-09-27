@@ -6,6 +6,8 @@ import React, { useEffect, useState } from "react";
 import { ensureToken, fetchUserEmail } from "./google";
 import { isAllowedEmail, STRIPE_LINK_MONTHLY, STRIPE_LINK_YEARLY } from "./allowlist";
 
+import { track } from "./analytics/tiktok";
+
 
 export default function LandingPage({ onSignedIn, error }) {
   const [signingIn, setSigningIn] = useState(false);
@@ -15,6 +17,12 @@ export default function LandingPage({ onSignedIn, error }) {
 
   // --- Lightbox state + data ---
   const [lightboxIndex, setLightboxIndex] = useState/** @type {number|null} */(null);
+
+    // TikTok: page view on landing
+  useEffect(() => {
+    track("PageView", { page: "Landing" });
+  }, []);
+
 
   const peekImages = [
     { src: "/tokboard_crop_kpis.png",    alt: "TokBoard KPI cards",               caption: "At-a-glance KPIs" },
@@ -62,6 +70,7 @@ export default function LandingPage({ onSignedIn, error }) {
     setSigningIn(true);
     try {
       await ensureToken("consent"); // may redirect
+      track("ClickButton", { label: "Sign in with Google" });
 
       const tok = window.gapi?.client?.getToken?.();
       if (tok?.access_token) {
@@ -76,6 +85,7 @@ export default function LandingPage({ onSignedIn, error }) {
              return;
            }
           // Allowed → proceed
+          track("CompleteRegistration", { method: "Google" }); 
           onSignedIn?.(em);
           setSigningIn(false);
           return;
@@ -392,12 +402,15 @@ export default function LandingPage({ onSignedIn, error }) {
         {/* Plans toggle button (higher contrast than a link) */}
         <div style={{ textAlign: "center", marginTop: 12 }}>
           <button
-            type="button"
-            className="btn-ghost"
-            onClick={() => setShowPlans((s) => !s)}
-          >
-            {showPlans ? "Hide plans" : "See plans & pricing"}
-          </button>
+          type="button"
+          className="btn-ghost"
+          onClick={() => {
+            track("ClickButton", { label: "See plans & pricing" });
+            setShowPlans((s) => !s);
+          }}
+        >
+          {showPlans ? "Hide plans" : "See plans & pricing"}
+        </button>
         </div>
 
         {error && <p className="err">{error}</p>}
