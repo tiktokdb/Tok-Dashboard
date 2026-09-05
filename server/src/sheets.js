@@ -17,6 +17,11 @@ function valuesFromObject(headers, obj) {
   return headers.map((header) => obj[header] ?? "");
 }
 
+function isMissingSheetError(err) {
+  const message = String(err?.message || err?.errors?.[0]?.message || "").toLowerCase();
+  return message.includes("unable to parse range") || message.includes("not found");
+}
+
 export function createSheetsClient(config) {
   const auth = new google.auth.JWT({
     email: config.googleServiceAccountEmail,
@@ -53,6 +58,32 @@ export function createSheetsClient(config) {
 
   async function readRows(title, headers) {
     await ensureLedgerSheets();
+    return readRowsReadOnly(title, headers);
+  }
+
+  async function readRowsReadOnly(title, headers) {
+    try {
+      const resp = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `'${title}'!A2:${String.fromCharCode(64 + headers.length)}`
+      });
+      return (resp.data.values || []).map((row) => objectFromRow(headers, row));
+    } catch (err) {
+      if (isMissingSheetError(err)) return [];
+      throw err;
+    }
+  }
+
+  async function readSubscriptionsReadOnly() {
+    return readRowsReadOnly("Subscriptions", SUBSCRIPTION_HEADERS);
+  }
+
+  async function readAllowlistMetadataReadOnly() {
+    return readRowsReadOnly("AllowlistMetadata", ALLOWLIST_METADATA_HEADERS);
+  }
+
+  async function readRowsWithEnsure(title, headers) {
+    await ensureLedgerSheets();
     const resp = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: `'${title}'!A2:${String.fromCharCode(64 + headers.length)}`
@@ -69,7 +100,7 @@ export function createSheetsClient(config) {
   }
 
   async function readAllowlistMetadata() {
-    return readRows("AllowlistMetadata", ALLOWLIST_METADATA_HEADERS);
+    return readRowsWithEnsure("AllowlistMetadata", ALLOWLIST_METADATA_HEADERS);
   }
 
   async function appendAllowlistEmail(email) {
@@ -144,6 +175,14 @@ export function createSheetsClient(config) {
     return merged;
   }
 
+  async function upsertManyAllowlistMetadata(rows) {
+    const results = [];
+    for (const row of rows) {
+      results.push(await upsertAllowlistMetadata(row));
+    }
+    return results;
+  }
+
   async function hasProcessedEvent(eventId) {
     if (!eventId) return false;
     await ensureLedgerSheets();
@@ -202,10 +241,13 @@ export function createSheetsClient(config) {
     ensureLedgerSheets,
     readAllowlist,
     readAllowlistMetadata,
+    readAllowlistMetadataReadOnly,
     appendAllowlistEmail,
     removeStripeManagedAllowlistEmail,
     upsertAllowlistMetadata,
+    upsertManyAllowlistMetadata,
     readSubscriptions: () => readRows("Subscriptions", SUBSCRIPTION_HEADERS),
+    readSubscriptionsReadOnly,
     findSubscriptionsByNormalizedEmail,
     hasProcessedEvent,
     recordProcessedEvent,
