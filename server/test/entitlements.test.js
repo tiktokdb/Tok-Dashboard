@@ -1,8 +1,38 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { aggregateAccess } from "../src/entitlements.js";
+import { aggregateAccess, subscriptionQualifies } from "../src/entitlements.js";
 
 const now = new Date("2026-09-05T00:00:00.000Z");
+
+test("active subscription without scheduled cancellation qualifies", () => {
+  assert.equal(subscriptionQualifies({
+    status: "active",
+    cancel_at_period_end: "false"
+  }, now), true);
+});
+
+test("active subscription scheduled to cancel in the future qualifies", () => {
+  assert.equal(subscriptionQualifies({
+    status: "active",
+    cancel_at_period_end: "true",
+    current_period_end: "2026-10-05T00:00:00.000Z"
+  }, now), true);
+});
+
+test("active subscription scheduled to cancel at an expired period end does not qualify", () => {
+  assert.equal(subscriptionQualifies({
+    status: "active",
+    cancel_at_period_end: "true",
+    current_period_end: "2026-09-05T00:00:00.000Z"
+  }, now), false);
+});
+
+test("trialing subscription within a future period qualifies", () => {
+  assert.equal(subscriptionQualifies({
+    status: "trialing",
+    current_period_end: "2026-10-05T00:00:00.000Z"
+  }, now), true);
+});
 
 test("keeps access when any subscription still qualifies", () => {
   const result = aggregateAccess([

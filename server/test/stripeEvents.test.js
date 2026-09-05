@@ -96,11 +96,8 @@ class FakeSheets {
 
 test("Stripe subscription events update one canonical subscription row", async () => {
   const sheets = new FakeSheets();
-  const stripe = {
-    subscriptions: {
-      retrieve: async () => subscription("active", "checkout")
-    }
-  };
+  let retrievedSubscription = subscription("active", "checkout");
+  const stripe = { subscriptions: { retrieve: async () => retrievedSubscription } };
 
   await handleStripeEvent({
     event: event("evt_checkout", "checkout.session.completed", {
@@ -117,8 +114,9 @@ test("Stripe subscription events update one canonical subscription row", async (
   assert.equal(sheets.rows[0].status, "active");
   assert.equal(sheets.rows[0].normalized_email, "masgorden@gmail.com");
 
+  retrievedSubscription = subscription("active", "created");
   await handleStripeEvent({
-    event: event("evt_created", "customer.subscription.created", subscription("active", "created")),
+    event: event("evt_created", "customer.subscription.created", { id: "sub_test_123" }),
     stripe,
     sheets,
     config
@@ -128,11 +126,12 @@ test("Stripe subscription events update one canonical subscription row", async (
   assert.equal(sheets.rows[0].latest_event_id, "evt_created");
   assert.equal(sheets.rows[0].status, "active");
 
+  retrievedSubscription = subscription("active", "updated", { cancel_at_period_end: true });
   await handleStripeEvent({
     event: event(
       "evt_updated",
       "customer.subscription.updated",
-      subscription("active", "updated", { cancel_at_period_end: true })
+      { id: "sub_test_123", status: "active", cancel_at_period_end: true }
     ),
     stripe,
     sheets,

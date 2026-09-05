@@ -99,7 +99,11 @@ class FakeSheets {
 async function sendSubscriptionEvent(sheets, id, type, sub) {
   return handleStripeEvent({
     event: event(id, type, sub),
-    stripe: {},
+    stripe: {
+      subscriptions: {
+        retrieve: async () => sub
+      }
+    },
     sheets,
     config
   });
@@ -156,6 +160,37 @@ test("cancel at period end leaves email in Allowlist", async () => {
   assert.equal(hasAllowlistEmail(sheets), true);
 });
 
+test("customer.subscription.updated scheduling future cancellation keeps Allowlist entry", async () => {
+  const sheets = new FakeSheets();
+  const fullSubscription = subscription({ id: "sub_future_cancel", cancelAtPeriodEnd: true });
+
+  await sendSubscriptionEvent(
+    sheets,
+    "evt_active",
+    "customer.subscription.created",
+    subscription({ id: "sub_future_cancel" })
+  );
+
+  await handleStripeEvent({
+    event: event("evt_updated_thin", "customer.subscription.updated", {
+      id: "sub_future_cancel",
+      status: "active",
+      cancel_at_period_end: true
+    }),
+    stripe: {
+      subscriptions: {
+        retrieve: async () => fullSubscription
+      }
+    },
+    sheets,
+    config
+  });
+
+  assert.equal(hasAllowlistEmail(sheets), true);
+  assert.equal(sheets.rows[0].cancel_at_period_end, "true");
+  assert.equal(sheets.rows[0].paid_through_date, "2027-01-01T00:00:00.000Z");
+});
+
 test("period actually expires removes Stripe-managed Allowlist entry when no other subscription qualifies", async () => {
   const sheets = new FakeSheets();
 
@@ -195,6 +230,52 @@ test("monthly expires but yearly remains active keeps email in Allowlist", async
     "evt_monthly_deleted",
     "customer.subscription.deleted",
     subscription({ id: "sub_monthly", status: "canceled", canceledAt: 1791000000 })
+  );
+
+  assert.equal(hasAllowlistEmail(sheets), true);
+});
+
+test("cancel-at-period-end monthly plus active yearly keeps access", async () => {
+  const sheets = new FakeSheets();
+
+  await sendSubscriptionEvent(
+    sheets,
+    "evt_monthly_canceling",
+    "customer.subscription.created",
+    subscription({
+      id: "sub_monthly_canceling",
+      priceId: "price_monthly_test",
+      cancelAtPeriodEnd: true
+    })
+  );
+  await sendSubscriptionEvent(
+    sheets,
+    "evt_yearly_active",
+    "customer.subscription.created",
+    subscription({ id: "sub_yearly_active", priceId: "price_yearly_test" })
+  );
+
+  assert.equal(hasAllowlistEmail(sheets), true);
+});
+
+test("cancel-at-period-end yearly plus active monthly keeps access", async () => {
+  const sheets = new FakeSheets();
+
+  await sendSubscriptionEvent(
+    sheets,
+    "evt_yearly_canceling",
+    "customer.subscription.created",
+    subscription({
+      id: "sub_yearly_canceling",
+      priceId: "price_yearly_test",
+      cancelAtPeriodEnd: true
+    })
+  );
+  await sendSubscriptionEvent(
+    sheets,
+    "evt_monthly_active",
+    "customer.subscription.created",
+    subscription({ id: "sub_monthly_active", priceId: "price_monthly_test" })
   );
 
   assert.equal(hasAllowlistEmail(sheets), true);

@@ -54,6 +54,16 @@ export async function handleStripeEvent({ event, stripe, sheets, config }) {
   switch (event.type) {
     case "customer.subscription.created":
     case "customer.subscription.updated":
+      result = await upsertSubscriptionFromId({
+        stripe,
+        sheets,
+        config,
+        subscriptionId: event.data.object.id,
+        eventId: event.id,
+        source: "stripe_webhook"
+      });
+      break;
+
     case "customer.subscription.deleted":
       result = await upsertSubscriptionObject({
         stripe,

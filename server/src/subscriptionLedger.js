@@ -22,13 +22,32 @@ function isoFromUnix(seconds) {
   return seconds ? new Date(seconds * 1000).toISOString() : "";
 }
 
+const PRESERVE_EXISTING_WHEN_EMPTY = new Set([
+  "login_email",
+  "normalized_email",
+  "stripe_customer_id",
+  "stripe_price_id",
+  "plan",
+  "current_period_end",
+  "paid_through_date",
+  "cancellation_date"
+]);
+
 function mergeSubscriptionRow(existing, next) {
   const createdAt = [existing.created_at, next.created_at].filter(Boolean).sort()[0] || "";
-  return {
+  const merged = {
     ...existing,
-    ...next,
     created_at: createdAt || next.created_at || existing.created_at || new Date().toISOString()
   };
+
+  for (const [key, value] of Object.entries(next)) {
+    if (PRESERVE_EXISTING_WHEN_EMPTY.has(key) && (value === "" || value === null || value === undefined)) {
+      continue;
+    }
+    merged[key] = value;
+  }
+
+  return merged;
 }
 
 export function canonicalizeSubscriptionRows(existingRows, next) {
