@@ -3,6 +3,7 @@ import React, { useMemo, useRef, useState } from "react";
 import Products from "./tabs/Products";
 import BrandDeals from "./tabs/BrandDeals";
 import { initSheetStructure } from "./google";
+import { openCustomerPortal } from "./billing";
 
 const TABS = [
   { key: "products", label: "Products" },
@@ -11,6 +12,8 @@ const TABS = [
 
 export default function Dashboard({ email, ssid, onSignOut }) {
   const [tab, setTab] = useState("products");
+  const [billingBusy, setBillingBusy] = useState(false);
+  const [billingError, setBillingError] = useState("");
   const didInitRef = useRef(false);
 
   const TabComp = useMemo(() => {
@@ -32,6 +35,18 @@ export default function Dashboard({ email, ssid, onSignOut }) {
       // Optional tiny retry:
       // didInitRef.current = false;
       // setTimeout(handleHiddenIframeLoad, 800);
+    }
+  }
+
+  async function handleManageBilling() {
+    setBillingBusy(true);
+    setBillingError("");
+    try {
+      await openCustomerPortal();
+    } catch (e) {
+      setBillingError(e?.message || "Could not open billing portal.");
+    } finally {
+      setBillingBusy(false);
     }
   }
 
@@ -59,6 +74,9 @@ export default function Dashboard({ email, ssid, onSignOut }) {
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span className="muted">Signed in as <b>{email}</b></span>
+          <button className="btn" onClick={handleManageBilling} disabled={billingBusy}>
+            {billingBusy ? "Opening..." : "Manage Subscription"}
+          </button>
           <button className="btn" onClick={onSignOut}>Sign out</button>
         </div>
       </div>
@@ -87,6 +105,9 @@ export default function Dashboard({ email, ssid, onSignOut }) {
 
       {/* Visible page content = your in-app tabs only */}
       <div className="page" style={{ padding: 24 }}>
+        {billingError && (
+          <p style={{ color: "var(--danger)", marginTop: 0 }}>{billingError}</p>
+        )}
         <TabComp email={email} ssid={ssid} />
       </div>
     </>

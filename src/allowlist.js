@@ -50,7 +50,7 @@ function setCache(items) {
 }
 
 export async function fetchAllowlist() {
-  if (!SSID) return [];
+  if (!SSID) throw new Error("Allowlist is not configured");
   const cached = getCache();
   if (cached) return cached;
 
@@ -72,7 +72,12 @@ export async function fetchAllowlist() {
 }
 
 export async function isAllowedEmail(email) {
-  if (!SSID) return true;  // if no sheet configured, allow everyone
-  const list = await fetchAllowlist();
-  return matchAllowed(email, list);
+  if (!SSID) return false;
+  try {
+    const list = await fetchAllowlist();
+    return matchAllowed(email, list);
+  } catch (e) {
+    console.warn("Allowlist lookup failed:", e?.message || e);
+    return false;
+  }
 }
