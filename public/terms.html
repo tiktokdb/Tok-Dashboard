@@ -16,7 +16,7 @@
 <body>
   <div class="wrap">
     <h1>Terms of Service</h1>
-    <p class="muted">Effective: September 5, 2026</p>
+    <p class="muted">Effective: <span id="eff"></span></p>
 
     <h2>Overview</h2>
     <p>TokBoard is provided on a subscription basis “as is” and “as available”. We may modify or discontinue features at any time.</p>
@@ -24,9 +24,8 @@
     <h2>Subscription & Billing</h2>
     <ul>
       <li>Plans are billed in advance and auto-renew each term unless canceled.</li>
-      <li>Customers can manage or cancel subscriptions through the TokBoard Billing or Manage Subscription link.</li>
-      <li>Cancellation normally takes effect at the end of the current paid term, and access normally continues until that paid-through date.</li>
-      <li><b>Refunds:</b> Refund requests are reviewed through TokBoard support and the payment processor. Subscription access follows the resulting subscription status and paid-through date.</li>
+      <li>You can cancel anytime; your access continues through the paid period.</li>
+      <li><b>Refunds:</b> <u>All sales are final</u>. No refunds are offered <u>except where required by law</u>.</li>
       <li>Prices and plans may change; founding subscribers remain grandfathered at their original rate while they keep an active subscription.</li>
     </ul>
 
@@ -51,5 +50,10 @@
     <h2>Contact</h2>
     <p>Email: <a href="mailto:tokboardapp@gmail.com">tokboardapp@gmail.com</a></p>
   </div>
+
+  <script>
+    document.getElementById('eff').textContent =
+      new Date().toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
+  </script>
 </body>
 </html>
