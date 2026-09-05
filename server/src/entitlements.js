@@ -1,22 +1,16 @@
 const QUALIFYING_STATUSES = new Set(["active", "trialing"]);
-const GRACE_STATUSES = new Set(["past_due"]);
 
 export function subscriptionQualifies(row, now = new Date()) {
   const status = String(row.status || "").toLowerCase();
   const paidThrough = row.paid_through_date || row.current_period_end;
   const paidThroughMs = paidThrough ? Date.parse(paidThrough) : NaN;
+  const cancelAtPeriodEnd = String(row.cancel_at_period_end || "").toLowerCase() === "true";
 
-  if (QUALIFYING_STATUSES.has(status)) return true;
-
-  if (status === "canceled" && Number.isFinite(paidThroughMs)) {
-    return paidThroughMs > now.getTime();
+  if (status === "trialing") return true;
+  if (status === "active" && cancelAtPeriodEnd) {
+    return Number.isFinite(paidThroughMs) && paidThroughMs > now.getTime();
   }
-
-  if (GRACE_STATUSES.has(status) && Number.isFinite(paidThroughMs)) {
-    return paidThroughMs > now.getTime();
-  }
-
-  return false;
+  return QUALIFYING_STATUSES.has(status);
 }
 
 export function aggregateAccess(rows, now = new Date()) {

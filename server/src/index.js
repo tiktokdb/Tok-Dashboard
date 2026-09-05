@@ -1,11 +1,10 @@
 import express from "express";
 import cors from "cors";
 import { getServerConfig } from "./config.js";
-import { normalizeEmail } from "./email.js";
 import { createGoogleAuth } from "./googleAuth.js";
 import { createSheetsClient } from "./sheets.js";
 import { createStripeClient } from "./stripeClient.js";
-import { aggregateAccess } from "./entitlements.js";
+import { createPortalSessionForRequest } from "./billingPortal.js";
 import { handleStripeEvent } from "./stripeEvents.js";
 
 const config = getServerConfig();
@@ -52,34 +51,7 @@ app.get("/api/health", (_req, res) => {
 
 app.post("/api/billing/portal", async (req, res) => {
   try {
-    const { email } = await googleAuth.verifyRequest(req);
-    const normalizedEmail = normalizeEmail(email);
-    const subscriptions = await sheets.findSubscriptionsByNormalizedEmail(normalizedEmail);
-    const access = aggregateAccess(subscriptions);
-
-    if (!access.hasAccess) {
-      return res.status(403).json({
-        error: "No active paid subscription was found for this Google account."
-      });
-    }
-
-    const customerIds = [...new Set(
-      subscriptions
-        .filter((row) => row.stripe_customer_id)
-        .map((row) => row.stripe_customer_id)
-    )];
-
-    if (customerIds.length !== 1) {
-      return res.status(409).json({
-        error: "This account needs billing reconciliation before self-service billing can be opened."
-      });
-    }
-
-    const session = await stripe.billingPortal.sessions.create({
-      customer: customerIds[0],
-      return_url: config.stripePortalReturnUrl
-    });
-
+    const session = await createPortalSessionForRequest({ req, googleAuth, sheets, stripe, config });
     return res.json({ url: session.url });
   } catch (err) {
     const status = err.status || 500;

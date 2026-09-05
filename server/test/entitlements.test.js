@@ -14,12 +14,12 @@ test("keeps access when any subscription still qualifies", () => {
   assert.equal(result.activeSubscriptionCount, 1);
 });
 
-test("keeps canceled access through paid-through date", () => {
+test("does not qualify canceled subscriptions even with a future paid-through date", () => {
   const result = aggregateAccess([
     { status: "canceled", paid_through_date: "2026-10-01T00:00:00.000Z" }
   ], now);
 
-  assert.equal(result.hasAccess, true);
+  assert.equal(result.hasAccess, false);
 });
 
 test("does not qualify fully expired canceled subscriptions", () => {
