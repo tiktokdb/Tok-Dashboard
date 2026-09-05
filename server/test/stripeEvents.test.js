@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { handleStripeEvent } from "../src/stripeEvents.js";
 import { canonicalizeSubscriptionRows } from "../src/subscriptionLedger.js";
+import { normalizeEmail } from "../src/email.js";
 
 const config = {
   monthlyPriceId: "price_monthly_test",
@@ -38,8 +39,10 @@ function event(id, type, object) {
 }
 
 class FakeSheets {
-  constructor() {
+  constructor({ allowlist = [], metadata = [] } = {}) {
     this.rows = [];
+    this.allowlist = allowlist;
+    this.metadata = metadata;
     this.processedEvents = new Set();
   }
 
@@ -55,6 +58,39 @@ class FakeSheets {
     const { rows, merged } = canonicalizeSubscriptionRows(this.rows, next);
     this.rows = rows;
     return merged;
+  }
+
+  async findSubscriptionsByNormalizedEmail(normalizedEmail) {
+    return this.rows.filter((row) => row.normalized_email === normalizedEmail);
+  }
+
+  async readAllowlist() {
+    return this.allowlist;
+  }
+
+  async readAllowlistMetadata() {
+    return this.metadata;
+  }
+
+  async appendAllowlistEmail(email) {
+    if (!this.allowlist.some((entry) => normalizeEmail(entry) === normalizeEmail(email))) {
+      this.allowlist.push(email);
+    }
+  }
+
+  async removeStripeManagedAllowlistEmail(email) {
+    const index = this.allowlist.findIndex((entry) => normalizeEmail(entry) === normalizeEmail(email));
+    if (index >= 0) this.allowlist.splice(index, 1);
+  }
+
+  async upsertAllowlistMetadata(next) {
+    const index = this.metadata.findIndex((row) => row.normalized_email === next.normalized_email);
+    if (index >= 0) {
+      this.metadata[index] = { ...this.metadata[index], ...next };
+      return this.metadata[index];
+    }
+    this.metadata.push(next);
+    return next;
   }
 }
 

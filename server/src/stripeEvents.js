@@ -1,4 +1,5 @@
 import { rowFromStripeSubscription } from "./subscriptionLedger.js";
+import { syncAllowlistForEmail } from "./allowlistSync.js";
 
 async function getCustomer(stripe, customerId) {
   if (!customerId || typeof customerId !== "string") return null;
@@ -14,7 +15,15 @@ async function upsertSubscriptionFromId({ stripe, sheets, config, subscriptionId
   const customer = typeof subscription.customer === "string"
     ? await getCustomer(stripe, subscription.customer)
     : subscription.customer;
-  return sheets.upsertSubscription(rowFromStripeSubscription(subscription, customer, eventId, source, config));
+  const row = await sheets.upsertSubscription(rowFromStripeSubscription(subscription, customer, eventId, source, config));
+  return {
+    subscription: row,
+    allowlist: await syncAllowlistForEmail({
+      sheets,
+      normalizedEmail: row.normalized_email,
+      latestEventId: eventId
+    })
+  };
 }
 
 async function upsertSubscriptionObject({ stripe, sheets, config, subscription, eventId, source }) {
@@ -24,7 +33,15 @@ async function upsertSubscriptionObject({ stripe, sheets, config, subscription, 
   const customer = typeof subscription.customer === "object"
     ? subscription.customer
     : await getCustomer(stripe, customerId);
-  return sheets.upsertSubscription(rowFromStripeSubscription(subscription, customer, eventId, source, config));
+  const row = await sheets.upsertSubscription(rowFromStripeSubscription(subscription, customer, eventId, source, config));
+  return {
+    subscription: row,
+    allowlist: await syncAllowlistForEmail({
+      sheets,
+      normalizedEmail: row.normalized_email,
+      latestEventId: eventId
+    })
+  };
 }
 
 export async function handleStripeEvent({ event, stripe, sheets, config }) {

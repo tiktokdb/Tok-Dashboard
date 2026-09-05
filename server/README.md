@@ -8,7 +8,18 @@ Phase 1 behavior:
 - Creates Stripe Customer Portal sessions only after deriving the email from a verified Google token.
 - Handles Stripe webhooks idempotently with a `WebhookEvents` tab.
 - Upserts subscription state into a `Subscriptions` tab.
-- Does not rewrite or delete the existing `Allowlist` tab.
+- Syncs Stripe-managed access into the existing `Allowlist` tab while preserving manual/legacy rows.
+
+## Allowlist Metadata
+
+The frontend still reads `Allowlist!A:A`.
+
+The backend uses a separate `AllowlistMetadata` tab to track which rows it owns:
+
+- `owns_allowlist_entry=true`: the backend appended this email because no matching Allowlist entry existed.
+- `owns_allowlist_entry=false`: the email was already present, so it is treated as manual/legacy access.
+
+Webhook expiration only removes backend-owned entries, and only after all subscriptions for the normalized email no longer qualify.
 
 ## Endpoints
 
