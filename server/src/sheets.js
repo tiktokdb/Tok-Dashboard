@@ -73,6 +73,11 @@ export function createSheetsClient(config) {
   }
 
   async function appendAllowlistEmail(email) {
+    const existing = await readAllowlist();
+    if (existing.some((entry) => normalizeEmail(entry) === normalizeEmail(email))) {
+      return false;
+    }
+
     await sheets.spreadsheets.values.append({
       spreadsheetId,
       range: "Allowlist!A:A",
@@ -80,6 +85,7 @@ export function createSheetsClient(config) {
       insertDataOption: "INSERT_ROWS",
       requestBody: { values: [[email]] }
     });
+    return true;
   }
 
   async function removeStripeManagedAllowlistEmail(email) {

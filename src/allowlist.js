@@ -49,9 +49,9 @@ function setCache(items) {
   try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), items })); } catch {}
 }
 
-export async function fetchAllowlist() {
+export async function fetchAllowlist({ fresh = false } = {}) {
   if (!SSID) return [];
-  const cached = getCache();
+  const cached = fresh ? null : getCache();
   if (cached) return cached;
 
   // A2:A skips a possible "email" header in A1
@@ -71,8 +71,8 @@ export async function fetchAllowlist() {
   return items;
 }
 
-export async function isAllowedEmail(email) {
+export async function isAllowedEmail(email, { fresh = false } = {}) {
   if (!SSID) return true;  // if no sheet configured, allow everyone
-  const list = await fetchAllowlist();
+  const list = await fetchAllowlist({ fresh });
   return matchAllowed(email, list);
 }

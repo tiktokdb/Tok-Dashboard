@@ -77,9 +77,7 @@ class FakeSheets {
   }
 
   async appendAllowlistEmail(email) {
-    if (!this.allowlist.some((entry) => normalizeEmail(entry) === normalizeEmail(email))) {
-      this.allowlist.push(email);
-    }
+    this.allowlist.push(email);
   }
 
   async removeStripeManagedAllowlistEmail(email) {
@@ -258,6 +256,36 @@ test("repeated webhook does not create duplicate Allowlist entries", async () =>
   await sendSubscriptionEvent(sheets, "evt_repeat", "customer.subscription.created", sub);
 
   assert.equal(sheets.allowlist.length, 1);
+});
+
+test("checkout and subscription.created granting same email create one Allowlist entry", async () => {
+  const sheets = new FakeSheets();
+  const sub = subscription({ id: "sub_checkout_created" });
+  const stripe = {
+    subscriptions: {
+      retrieve: async () => sub
+    }
+  };
+
+  await Promise.all([
+    handleStripeEvent({
+      event: event("evt_checkout", "checkout.session.completed", {
+        subscription: "sub_checkout_created"
+      }),
+      stripe,
+      sheets,
+      config
+    }),
+    handleStripeEvent({
+      event: event("evt_created", "customer.subscription.created", sub),
+      stripe,
+      sheets,
+      config
+    })
+  ]);
+
+  const matches = sheets.allowlist.filter((entry) => normalizeEmail(entry) === "masgorden@gmail.com");
+  assert.equal(matches.length, 1);
 });
 
 test("refund event alone does not remove access", async () => {

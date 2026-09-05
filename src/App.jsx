@@ -47,7 +47,7 @@ export default function App() {
 
   // called by LandingPage after Google sign-in completes
   async function handleSignedIn(em) {
-    const ok = await isAllowedEmail(em);
+    const ok = await isAllowedEmail(em, { fresh: true });
     if (!ok) {
       alert("Access requires an active subscription. Please choose a plan on the landing page.");
       signOut();
@@ -97,7 +97,7 @@ export default function App() {
 
         const em = await fetchUserEmail();
         if (em) {
-          const ok = await isAllowedEmail(em);
+          const ok = await isAllowedEmail(em, { fresh: true });
           if (!ok) {
             signOut();
             return;

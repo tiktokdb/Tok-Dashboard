@@ -11,11 +11,61 @@ export const ALLOWLIST_METADATA_HEADERS = [
   "latest_event_id"
 ];
 
+const allowlistLocks = new Map();
+
 function allowlistHasNormalizedEmail(entries, normalizedEmail) {
   return entries.some((entry) => normalizeEmail(entry) === normalizedEmail);
 }
 
-export async function syncAllowlistForEmail({ sheets, normalizedEmail, latestEventId, now = new Date() }) {
+function isDomainRule(entry) {
+  return String(entry || "").trim().startsWith("@");
+}
+
+async function withAllowlistLock(normalizedEmail, fn) {
+  const previous = allowlistLocks.get(normalizedEmail) || Promise.resolve();
+  let release;
+  const current = new Promise((resolve) => {
+    release = resolve;
+  });
+  const chained = previous.then(() => current);
+  allowlistLocks.set(normalizedEmail, chained);
+
+  try {
+    await previous;
+    return await fn();
+  } finally {
+    release();
+    if (allowlistLocks.get(normalizedEmail) === chained) {
+      allowlistLocks.delete(normalizedEmail);
+    }
+  }
+}
+
+async function canonicalizeStripeManagedEntries({ sheets, normalizedEmail, metadataRows, keepValue }) {
+  const ownedValues = metadataRows
+    .filter((row) => row.normalized_email === normalizedEmail && row.owns_allowlist_entry === "true")
+    .map((row) => row.allowlist_value || normalizedEmail);
+
+  for (const value of ownedValues) {
+    if (normalizeEmail(value) === normalizedEmail && normalizeEmail(value) !== normalizeEmail(keepValue)) {
+      await sheets.removeStripeManagedAllowlistEmail(value);
+    }
+  }
+
+  const entries = await sheets.readAllowlist();
+  const equivalentEntries = entries
+    .filter((entry) => !isDomainRule(entry))
+    .filter((entry) => normalizeEmail(entry) === normalizedEmail);
+
+  if (equivalentEntries.length <= 1) return;
+
+  for (const entry of equivalentEntries.slice(1)) {
+    const isOwned = ownedValues.some((value) => normalizeEmail(value) === normalizeEmail(entry));
+    if (isOwned) await sheets.removeStripeManagedAllowlistEmail(entry);
+  }
+}
+
+async function syncAllowlistForEmailUnlocked({ sheets, normalizedEmail, latestEventId, now }) {
   if (!normalizedEmail) {
     return { changed: false, action: "skipped_missing_email" };
   }
@@ -43,6 +93,12 @@ export async function syncAllowlistForEmail({ sheets, normalizedEmail, latestEve
         updated_at: timestamp,
         latest_event_id: latestEventId || ""
       });
+      await canonicalizeStripeManagedEntries({
+        sheets,
+        normalizedEmail,
+        metadataRows: await sheets.readAllowlistMetadata(),
+        keepValue: normalizedEmail
+      });
       return { changed: true, action: "added_stripe_managed_allowlist_entry" };
     }
 
@@ -54,6 +110,12 @@ export async function syncAllowlistForEmail({ sheets, normalizedEmail, latestEve
       first_added_at: existingMetadata?.first_added_at || timestamp,
       updated_at: timestamp,
       latest_event_id: latestEventId || ""
+    });
+    await canonicalizeStripeManagedEntries({
+      sheets,
+      normalizedEmail,
+      metadataRows: await sheets.readAllowlistMetadata(),
+      keepValue: existingMetadata?.allowlist_value || normalizedEmail
     });
     return { changed: false, action: "already_allowlisted" };
   }
@@ -78,4 +140,10 @@ export async function syncAllowlistForEmail({ sheets, normalizedEmail, latestEve
   }
 
   return { changed: false, action: "no_qualifying_subscription_no_owned_entry" };
+}
+
+export async function syncAllowlistForEmail({ sheets, normalizedEmail, latestEventId, now = new Date() }) {
+  return withAllowlistLock(normalizedEmail, () =>
+    syncAllowlistForEmailUnlocked({ sheets, normalizedEmail, latestEventId, now })
+  );
 }
