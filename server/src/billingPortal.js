@@ -57,7 +57,6 @@ export async function getBillingStatusForRequest({ req, googleAuth, sheets }) {
   const selection = selectPortalCustomer(subscriptions);
 
   return {
-    canManageBilling: selection.ok,
-    reason: selection.ok ? "" : selection.error
+    hasPaidSubscription: selection.ok
   };
 }

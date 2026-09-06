@@ -57,8 +57,7 @@ app.get("/api/billing/status", async (req, res) => {
     const status = err.status || 500;
     console.error("Billing status request failed", err);
     return res.status(status).json({
-      canManageBilling: false,
-      error: status === 500 ? "Could not check billing status." : err.message
+      hasPaidSubscription: false
     });
   }
 });

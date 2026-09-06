@@ -75,7 +75,7 @@ test("cancel-at-period-end subscription still paid through qualifies", () => {
   assert.equal(result.customerId, "cus_canceling");
 });
 
-test("billing status returns true without exposing Stripe identifiers for qualifying subscriptions", async () => {
+test("billing status returns only true for qualifying subscriptions", async () => {
   const status = await getBillingStatusForRequest({
     req: {},
     googleAuth: {
@@ -87,11 +87,8 @@ test("billing status returns true without exposing Stripe identifiers for qualif
   });
 
   assert.deepEqual(status, {
-    canManageBilling: true,
-    reason: ""
+    hasPaidSubscription: true
   });
-  assert.equal("customerId" in status, false);
-  assert.equal("qualifyingSubscriptions" in status, false);
 });
 
 test("billing status returns false for manual legacy users without Stripe subscriptions", async () => {
@@ -105,6 +102,28 @@ test("billing status returns false for manual legacy users without Stripe subscr
     }
   });
 
-  assert.equal(status.canManageBilling, false);
-  assert.match(status.reason, /No active paid subscription/);
+  assert.deepEqual(status, {
+    hasPaidSubscription: false
+  });
+});
+
+test("billing status stays true for cancel-at-period-end users before paid-through date", async () => {
+  const status = await getBillingStatusForRequest({
+    req: {},
+    googleAuth: {
+      verifyRequest: async () => ({ email: "canceling@example.com" })
+    },
+    sheets: {
+      findSubscriptionsByNormalizedEmail: async () => [
+        row("cus_canceling", "active", {
+          cancel_at_period_end: "true",
+          paid_through_date: "2099-10-01T00:00:00.000Z"
+        })
+      ]
+    }
+  });
+
+  assert.deepEqual(status, {
+    hasPaidSubscription: true
+  });
 });

@@ -14,7 +14,7 @@ export default function Dashboard({ email, ssid, onSignOut }) {
   const [tab, setTab] = useState("products");
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState("");
-  const [canManageBilling, setCanManageBilling] = useState(false);
+  const [hasPaidSubscription, setHasPaidSubscription] = useState(false);
   const didInitRef = useRef(false);
 
   const TabComp = useMemo(() => {
@@ -28,15 +28,15 @@ export default function Dashboard({ email, ssid, onSignOut }) {
   useEffect(() => {
     let cancelled = false;
 
-    setCanManageBilling(false);
+    setHasPaidSubscription(false);
     setBillingError("");
 
     fetchBillingStatus()
       .then((status) => {
-        if (!cancelled) setCanManageBilling(Boolean(status.canManageBilling));
+        if (!cancelled) setHasPaidSubscription(Boolean(status.hasPaidSubscription));
       })
       .catch(() => {
-        if (!cancelled) setCanManageBilling(false);
+        if (!cancelled) setHasPaidSubscription(false);
       });
 
     return () => {
@@ -94,7 +94,7 @@ export default function Dashboard({ email, ssid, onSignOut }) {
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span className="muted">Signed in as <b>{email}</b></span>
-          {canManageBilling && (
+          {hasPaidSubscription && (
             <button className="btn" onClick={handleManageBilling} disabled={billingBusy}>
               {billingBusy ? "Opening..." : "Manage Subscription"}
             </button>

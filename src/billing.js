@@ -31,12 +31,12 @@ export async function openCustomerPortal() {
 
 export async function fetchBillingStatus() {
   if (!BILLING_API_BASE) {
-    return { canManageBilling: false };
+    return { hasPaidSubscription: false };
   }
 
   const token = getAccessToken();
   if (!token) {
-    return { canManageBilling: false };
+    return { hasPaidSubscription: false };
   }
 
   const res = await fetch(`${BILLING_API_BASE}/api/billing/status`, {
@@ -47,10 +47,10 @@ export async function fetchBillingStatus() {
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    return { canManageBilling: false };
+    return { hasPaidSubscription: false };
   }
 
   return {
-    canManageBilling: Boolean(data.canManageBilling)
+    hasPaidSubscription: Boolean(data.hasPaidSubscription)
   };
 }
