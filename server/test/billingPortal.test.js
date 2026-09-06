@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { selectPortalCustomer } from "../src/billingPortal.js";
+import { getBillingStatusForRequest, selectPortalCustomer } from "../src/billingPortal.js";
 
 const now = new Date("2026-09-05T00:00:00.000Z");
 
@@ -73,4 +73,38 @@ test("cancel-at-period-end subscription still paid through qualifies", () => {
 
   assert.equal(result.ok, true);
   assert.equal(result.customerId, "cus_canceling");
+});
+
+test("billing status returns true without exposing Stripe identifiers for qualifying subscriptions", async () => {
+  const status = await getBillingStatusForRequest({
+    req: {},
+    googleAuth: {
+      verifyRequest: async () => ({ email: "paid@example.com" })
+    },
+    sheets: {
+      findSubscriptionsByNormalizedEmail: async () => [row("cus_paid", "active")]
+    }
+  });
+
+  assert.deepEqual(status, {
+    canManageBilling: true,
+    reason: ""
+  });
+  assert.equal("customerId" in status, false);
+  assert.equal("qualifyingSubscriptions" in status, false);
+});
+
+test("billing status returns false for manual legacy users without Stripe subscriptions", async () => {
+  const status = await getBillingStatusForRequest({
+    req: {},
+    googleAuth: {
+      verifyRequest: async () => ({ email: "legacy@example.com" })
+    },
+    sheets: {
+      findSubscriptionsByNormalizedEmail: async () => []
+    }
+  });
+
+  assert.equal(status.canManageBilling, false);
+  assert.match(status.reason, /No active paid subscription/);
 });

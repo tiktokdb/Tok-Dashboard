@@ -28,3 +28,29 @@ export async function openCustomerPortal() {
 
   window.location.assign(data.url);
 }
+
+export async function fetchBillingStatus() {
+  if (!BILLING_API_BASE) {
+    return { canManageBilling: false };
+  }
+
+  const token = getAccessToken();
+  if (!token) {
+    return { canManageBilling: false };
+  }
+
+  const res = await fetch(`${BILLING_API_BASE}/api/billing/status`, {
+    headers: {
+      authorization: `Bearer ${token}`
+    }
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { canManageBilling: false };
+  }
+
+  return {
+    canManageBilling: Boolean(data.canManageBilling)
+  };
+}

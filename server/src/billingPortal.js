@@ -49,3 +49,15 @@ export async function createPortalSessionForRequest({ req, googleAuth, sheets, s
     return_url: config.stripePortalReturnUrl
   });
 }
+
+export async function getBillingStatusForRequest({ req, googleAuth, sheets }) {
+  const { email } = await googleAuth.verifyRequest(req);
+  const normalizedEmail = normalizeEmail(email);
+  const subscriptions = await sheets.findSubscriptionsByNormalizedEmail(normalizedEmail);
+  const selection = selectPortalCustomer(subscriptions);
+
+  return {
+    canManageBilling: selection.ok,
+    reason: selection.ok ? "" : selection.error
+  };
+}

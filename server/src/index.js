@@ -4,7 +4,7 @@ import { getServerConfig } from "./config.js";
 import { createGoogleAuth } from "./googleAuth.js";
 import { createSheetsClient } from "./sheets.js";
 import { createStripeClient } from "./stripeClient.js";
-import { createPortalSessionForRequest } from "./billingPortal.js";
+import { createPortalSessionForRequest, getBillingStatusForRequest } from "./billingPortal.js";
 import { handleStripeEvent } from "./stripeEvents.js";
 
 const config = getServerConfig();
@@ -47,6 +47,20 @@ app.use(express.json());
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
+});
+
+app.get("/api/billing/status", async (req, res) => {
+  try {
+    const status = await getBillingStatusForRequest({ req, googleAuth, sheets });
+    return res.json(status);
+  } catch (err) {
+    const status = err.status || 500;
+    console.error("Billing status request failed", err);
+    return res.status(status).json({
+      canManageBilling: false,
+      error: status === 500 ? "Could not check billing status." : err.message
+    });
+  }
 });
 
 app.post("/api/billing/portal", async (req, res) => {

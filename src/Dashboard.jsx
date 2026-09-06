@@ -1,9 +1,9 @@
 // src/Dashboard.jsx
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Products from "./tabs/Products";
 import BrandDeals from "./tabs/BrandDeals";
 import { initSheetStructure } from "./google";
-import { openCustomerPortal } from "./billing";
+import { fetchBillingStatus, openCustomerPortal } from "./billing";
 
 const TABS = [
   { key: "products", label: "Products" },
@@ -14,6 +14,7 @@ export default function Dashboard({ email, ssid, onSignOut }) {
   const [tab, setTab] = useState("products");
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState("");
+  const [canManageBilling, setCanManageBilling] = useState(false);
   const didInitRef = useRef(false);
 
   const TabComp = useMemo(() => {
@@ -23,6 +24,25 @@ export default function Dashboard({ email, ssid, onSignOut }) {
       default: return Products;
     }
   }, [tab]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setCanManageBilling(false);
+    setBillingError("");
+
+    fetchBillingStatus()
+      .then((status) => {
+        if (!cancelled) setCanManageBilling(Boolean(status.canManageBilling));
+      })
+      .catch(() => {
+        if (!cancelled) setCanManageBilling(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [email]);
 
   async function handleHiddenIframeLoad() {
     if (!ssid) return;
@@ -74,9 +94,11 @@ export default function Dashboard({ email, ssid, onSignOut }) {
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span className="muted">Signed in as <b>{email}</b></span>
-          <button className="btn" onClick={handleManageBilling} disabled={billingBusy}>
-            {billingBusy ? "Opening..." : "Manage Subscription"}
-          </button>
+          {canManageBilling && (
+            <button className="btn" onClick={handleManageBilling} disabled={billingBusy}>
+              {billingBusy ? "Opening..." : "Manage Subscription"}
+            </button>
+          )}
           <button className="btn" onClick={onSignOut}>Sign out</button>
         </div>
       </div>
