@@ -82,7 +82,7 @@ export default function LandingPage({ onSignedIn, error }) {
         const em = await fetchUserEmail();
         if (em) {
           // NEW: check allowlist
-          const ok = await isAllowedEmail(em);
+          const ok = await isAllowedEmail(em, { fresh: true });
           if (!ok) {
              // Not on allowlist → keep them on landing and show pricing
              setNotAllowed(true);

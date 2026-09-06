@@ -1,0 +1,256 @@
+import { google } from "googleapis";
+import { SUBSCRIPTION_HEADERS, canonicalizeSubscriptionRows } from "./subscriptionLedger.js";
+import { normalizeEmail } from "./email.js";
+import { ALLOWLIST_METADATA_HEADERS } from "./allowlistSync.js";
+
+const WEBHOOK_HEADERS = ["event_id", "event_type", "created_at", "processed_at"];
+
+function isoFromUnix(seconds) {
+  return seconds ? new Date(seconds * 1000).toISOString() : "";
+}
+
+function objectFromRow(headers, row) {
+  return Object.fromEntries(headers.map((header, index) => [header, row[index] || ""]));
+}
+
+function valuesFromObject(headers, obj) {
+  return headers.map((header) => obj[header] ?? "");
+}
+
+function isMissingSheetError(err) {
+  const message = String(err?.message || err?.errors?.[0]?.message || "").toLowerCase();
+  return message.includes("unable to parse range") || message.includes("not found");
+}
+
+export function createSheetsClient(config) {
+  const auth = new google.auth.JWT({
+    email: config.googleServiceAccountEmail,
+    key: config.googleServiceAccountPrivateKey,
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"]
+  });
+
+  const sheets = google.sheets({ version: "v4", auth });
+  const spreadsheetId = config.googleBillingSheetId;
+
+  async function ensureSheet(title, headers) {
+    const meta = await sheets.spreadsheets.get({ spreadsheetId });
+    const hasSheet = (meta.data.sheets || []).some((sheet) => sheet.properties?.title === title);
+    if (!hasSheet) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: { requests: [{ addSheet: { properties: { title } } }] }
+      });
+    }
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `'${title}'!A1`,
+      valueInputOption: "RAW",
+      requestBody: { values: [headers] }
+    });
+  }
+
+  async function ensureLedgerSheets() {
+    await ensureSheet("Subscriptions", SUBSCRIPTION_HEADERS);
+    await ensureSheet("WebhookEvents", WEBHOOK_HEADERS);
+    await ensureSheet("AllowlistMetadata", ALLOWLIST_METADATA_HEADERS);
+  }
+
+  async function readRows(title, headers) {
+    await ensureLedgerSheets();
+    return readRowsReadOnly(title, headers);
+  }
+
+  async function readRowsReadOnly(title, headers) {
+    try {
+      const resp = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `'${title}'!A2:${String.fromCharCode(64 + headers.length)}`
+      });
+      return (resp.data.values || []).map((row) => objectFromRow(headers, row));
+    } catch (err) {
+      if (isMissingSheetError(err)) return [];
+      throw err;
+    }
+  }
+
+  async function readSubscriptionsReadOnly() {
+    return readRowsReadOnly("Subscriptions", SUBSCRIPTION_HEADERS);
+  }
+
+  async function readAllowlistMetadataReadOnly() {
+    return readRowsReadOnly("AllowlistMetadata", ALLOWLIST_METADATA_HEADERS);
+  }
+
+  async function readRowsWithEnsure(title, headers) {
+    await ensureLedgerSheets();
+    const resp = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${title}'!A2:${String.fromCharCode(64 + headers.length)}`
+    });
+    return (resp.data.values || []).map((row) => objectFromRow(headers, row));
+  }
+
+  async function readAllowlist() {
+    const resp = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "Allowlist!A2:A"
+    });
+    return (resp.data.values || []).flat().map((value) => String(value).trim()).filter(Boolean);
+  }
+
+  async function readAllowlistMetadata() {
+    return readRowsWithEnsure("AllowlistMetadata", ALLOWLIST_METADATA_HEADERS);
+  }
+
+  async function appendAllowlistEmail(email) {
+    const existing = await readAllowlist();
+    if (existing.some((entry) => normalizeEmail(entry) === normalizeEmail(email))) {
+      return false;
+    }
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: "Allowlist!A:A",
+      valueInputOption: "RAW",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: { values: [[email]] }
+    });
+    return true;
+  }
+
+  async function removeStripeManagedAllowlistEmail(email) {
+    const normalizedEmail = normalizeEmail(email);
+    const resp = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "Allowlist!A2:A"
+    });
+    const rows = resp.data.values || [];
+    const index = rows.findIndex((row) => normalizeEmail(row[0]) === normalizedEmail);
+    if (index < 0) return false;
+
+    const rowNumber = index + 2;
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId,
+      range: `Allowlist!A${rowNumber}:A${rowNumber}`
+    });
+    return true;
+  }
+
+  async function upsertAllowlistMetadata(next) {
+    await ensureLedgerSheets();
+    const resp = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "AllowlistMetadata!A2:G"
+    });
+    const rows = resp.data.values || [];
+    const existingIndex = rows.findIndex((row) => row[0] === next.normalized_email);
+    const existing = existingIndex >= 0
+      ? objectFromRow(ALLOWLIST_METADATA_HEADERS, rows[existingIndex])
+      : {};
+    const merged = {
+      ...existing,
+      ...next,
+      first_added_at: existing.first_added_at || next.first_added_at || new Date().toISOString()
+    };
+
+    if (existingIndex >= 0) {
+      const rowNumber = existingIndex + 2;
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `AllowlistMetadata!A${rowNumber}:G${rowNumber}`,
+        valueInputOption: "RAW",
+        requestBody: { values: [valuesFromObject(ALLOWLIST_METADATA_HEADERS, merged)] }
+      });
+    } else {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: "AllowlistMetadata!A:G",
+        valueInputOption: "RAW",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: { values: [valuesFromObject(ALLOWLIST_METADATA_HEADERS, merged)] }
+      });
+    }
+
+    return merged;
+  }
+
+  async function upsertManyAllowlistMetadata(rows) {
+    const results = [];
+    for (const row of rows) {
+      results.push(await upsertAllowlistMetadata(row));
+    }
+    return results;
+  }
+
+  async function hasProcessedEvent(eventId) {
+    if (!eventId) return false;
+    await ensureLedgerSheets();
+    const rows = await readRows("WebhookEvents", WEBHOOK_HEADERS);
+    return rows.some((row) => row.event_id === eventId);
+  }
+
+  async function recordProcessedEvent(event) {
+    await ensureLedgerSheets();
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: "WebhookEvents!A:D",
+      valueInputOption: "RAW",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: {
+        values: [[event.id, event.type, isoFromUnix(event.created), new Date().toISOString()]]
+      }
+    });
+  }
+
+  async function upsertSubscription(next) {
+    await ensureLedgerSheets();
+    const resp = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "Subscriptions!A2:O"
+    });
+    const existingRows = (resp.data.values || []).map((row) =>
+      objectFromRow(SUBSCRIPTION_HEADERS, row)
+    );
+
+    const { rows, merged } = canonicalizeSubscriptionRows(existingRows, next);
+
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId,
+      range: "Subscriptions!A2:O"
+    });
+
+    if (rows.length) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: "Subscriptions!A2",
+        valueInputOption: "RAW",
+        requestBody: { values: rows.map((row) => valuesFromObject(SUBSCRIPTION_HEADERS, row)) }
+      });
+    }
+
+    return merged;
+  }
+
+  async function findSubscriptionsByNormalizedEmail(normalizedEmail) {
+    const rows = await readRows("Subscriptions", SUBSCRIPTION_HEADERS);
+    return rows.filter((row) => row.normalized_email === normalizedEmail);
+  }
+
+  return {
+    ensureLedgerSheets,
+    readAllowlist,
+    readAllowlistMetadata,
+    readAllowlistMetadataReadOnly,
+    appendAllowlistEmail,
+    removeStripeManagedAllowlistEmail,
+    upsertAllowlistMetadata,
+    upsertManyAllowlistMetadata,
+    readSubscriptions: () => readRows("Subscriptions", SUBSCRIPTION_HEADERS),
+    readSubscriptionsReadOnly,
+    findSubscriptionsByNormalizedEmail,
+    hasProcessedEvent,
+    recordProcessedEvent,
+    upsertSubscription
+  };
+}
