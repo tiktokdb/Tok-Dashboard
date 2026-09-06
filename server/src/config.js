@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "dotenv/config.js";
 
 function optional(name, fallback = "") {
   return process.env[name] || fallback;

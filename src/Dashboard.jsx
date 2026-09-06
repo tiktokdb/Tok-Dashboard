@@ -10,14 +10,11 @@ const TABS = [
   { key: "branddeals", label: "Brand Deals" },
 ];
 
-const BILLING_TEST_EMAIL = "masgorden@gmail.com";
-
 export default function Dashboard({ email, ssid, onSignOut }) {
   const [tab, setTab] = useState("products");
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState("");
   const didInitRef = useRef(false);
-  const canManageBilling = String(email || "").trim().toLowerCase() === BILLING_TEST_EMAIL;
 
   const TabComp = useMemo(() => {
     switch (tab) {
@@ -77,11 +74,9 @@ export default function Dashboard({ email, ssid, onSignOut }) {
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span className="muted">Signed in as <b>{email}</b></span>
-          {canManageBilling && (
-            <button className="btn" onClick={handleManageBilling} disabled={billingBusy}>
-              {billingBusy ? "Opening..." : "Manage Subscription"}
-            </button>
-          )}
+          <button className="btn" onClick={handleManageBilling} disabled={billingBusy}>
+            {billingBusy ? "Opening..." : "Manage Subscription"}
+          </button>
           <button className="btn" onClick={onSignOut}>Sign out</button>
         </div>
       </div>
@@ -110,7 +105,7 @@ export default function Dashboard({ email, ssid, onSignOut }) {
 
       {/* Visible page content = your in-app tabs only */}
       <div className="page" style={{ padding: 24 }}>
-        {canManageBilling && billingError && (
+        {billingError && (
           <p style={{ color: "var(--danger)", marginTop: 0 }}>{billingError}</p>
         )}
         <TabComp email={email} ssid={ssid} />
